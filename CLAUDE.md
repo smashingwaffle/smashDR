@@ -14,7 +14,7 @@
 - A Uniden SDS200 is available as ground truth when debugging decodes.
 
 ## Build order
-1. Probe: IQ off the V4, spectrum/waterfall, IQ recording  <- current
+1. Probe: IQ off the V4, spectrum/waterfall, IQ recording, NFM audio + device settings  <- current
 2. C4FM demod + symbol timing, run on recordings
 3. P25 Phase 1 frame sync + NID (BCH 63,16)
 4. Frame types (HDU/LDU/TSBK), FEC
@@ -23,6 +23,14 @@
 7. DMR (4FSK, TDMA bursts, AMBE+2)
 8. P25 Phase 2
 UX comes after the decode chain works.
+
+## Code layout
+- `main.py` entry; `sdr_probe.py` receiver window + SDR reader thread
+- `dsp.py` block DSP with state (spectrum, StreamFir, NfmMonitor -> 48 kHz)
+- `audio.py` QtMultimedia output, converts to device's preferred format
+- `settings.py` settings.json store (not in git)
+- Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
+  and a conflicting change breaks the F5 `git pull --ff-only`.
 
 ## Develop against recordings
 `recordings/*.cu8` (interleaved uint8 IQ) + `.json` sidecar with centre,

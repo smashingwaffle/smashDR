@@ -1,29 +1,25 @@
 """
-sdr_probe.py  -  Step 1 of the P25 / DMR decoder project.
+sdr_probe.py  -  smashDR receiver window (step 1: probe + audio monitor).
 
-Goal of this step: prove we get clean IQ off the RTL-SDR Blog V4 and can see
-a signal. Nothing is decoded yet.
-
-What it does
-  * Opens the V4 through pyrtlsdr (rtl-sdr-blog librtlsdr)
+  * Opens the RTL-SDR Blog V4 through pyrtlsdr (rtl-sdr-blog librtlsdr)
   * Live spectrum + waterfall
   * Click (or drag the yellow marker) to put a 12.5 kHz channel on a signal
-  * Shows channel peak above noise floor, ADC clipping %, RMS level
-  * Records raw IQ (.cu8 + .json sidecar) so the decoder can be developed
-    and tested offline against real captures
+  * NFM audio monitor on the marker channel, with squelch / volume / mute
+  * Settings tab: audio output device + test tone
+  * Records raw IQ (.cu8 + .json sidecar) for offline decoder development
+  * Remembers frequency, gain, rate, audio device etc. in settings.json
 
 The hardware is tuned slightly ABOVE the target frequency so the target
 never sits on the dongle's DC spike.
 
 Setup (Windows)
-  pip install pyrtlsdr numpy pyqtgraph PyQt6
-  Put rtlsdr.dll, msvcr100.dll, pthreadVC2.dll (x64 folder of the rtl-sdr-blog release)
-  next to this script, or in a "lib" folder next to it.
-  The V4 needs the WinUSB driver (Zadig) - one-time step.
+  pip install -r requirements.txt
+  rtlsdr.dll, msvcr100.dll, pthreadVC2.dll (x64, rtl-sdr-blog release) next
+  to this script or in a "lib" folder. WinUSB driver via Zadig (one-time).
 
 Run
-  python sdr_probe.py --freq 851.0125
-  python sdr_probe.py --freq 446.0 --gain 30 --rate 1.2
+  python main.py                    (uses last settings)
+  python main.py --freq 851.0125    (command line overrides settings)
 """
 
 import argparse
@@ -37,10 +33,12 @@ from pathlib import Path
 
 import numpy as np
 
-HERE = Path(__file__).resolve().parent
-VERSION = "0.0.1"
+import settings as cfg
+from dsp import FFT_SIZE, NfmMonitor, cu8_to_iq, power_spectrum_db
 
-FFT_SIZE = 2048
+HERE = Path(__file__).resolve().parent
+VERSION = "0.0.2"
+
 READ_BYTES = 524288          # 262144 IQ samples per read (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
 CHAN_HALF_BW = 6.25e3        # 12.5 kHz channel
@@ -120,31 +118,13 @@ except Exception as e:  # missing DLL shows up as ImportError/OSError
 from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: E402
 import pyqtgraph as pg  # noqa: E402
 
+try:
+    import audio  # noqa: E402
+except Exception as e:  # QtMultimedia missing
+    print("[!] Audio disabled, QtMultimedia not available:", e)
+    audio = None
+
 pg.setConfigOptions(imageAxisOrder="row-major", antialias=False)
-
-
-# --------------------------------------------------------------------------
-# DSP helpers
-# --------------------------------------------------------------------------
-_WIN = np.hanning(FFT_SIZE).astype(np.float32)
-_WIN_NORM = float(_WIN.sum() ** 2)
-
-
-def cu8_to_iq(raw: bytes) -> np.ndarray:
-    """Interleaved unsigned 8-bit IQ -> complex64, roughly -1..+1."""
-    a = np.frombuffer(raw, dtype=np.uint8).astype(np.float32)
-    a -= 127.4
-    a *= 1.0 / 128.0
-    return a.view(np.complex64)
-
-
-def power_spectrum_db(iq: np.ndarray) -> np.ndarray:
-    """Averaged, fft-shifted power spectrum in dBFS."""
-    k = len(iq) // FFT_SIZE
-    blk = iq[: k * FFT_SIZE].reshape(k, FFT_SIZE) * _WIN
-    p = np.abs(np.fft.fft(blk, axis=1)) ** 2
-    p = np.fft.fftshift(p.mean(axis=0)) / _WIN_NORM
-    return 10.0 * np.log10(p + 1e-20)
 
 
 # --------------------------------------------------------------------------
@@ -153,11 +133,16 @@ def power_spectrum_db(iq: np.ndarray) -> np.ndarray:
 class SdrReader(QtCore.QThread):
     # spectrum_db, center_hz, rate_hz, stats dict
     frame = QtCore.pyqtSignal(object, float, float, object)
+    audio = QtCore.pyqtSignal(bytes)
     status = QtCore.pyqtSignal(str)
 
-    def __init__(self, sdr: RtlSdr):
+    def __init__(self, sdr: RtlSdr, target_hz: float, squelch_db: float):
         super().__init__()
         self.sdr = sdr
+        self.target_hz = target_hz
+        self.squelch_db = squelch_db
+        self.monitor = NfmMonitor()
+        self._mon_ok = False
         self._running = True
         self._lock = threading.Lock()
         self._pending = {}
@@ -199,11 +184,31 @@ class SdrReader(QtCore.QThread):
         except Exception as e:
             self.status.emit(f"SDR setting failed: {e}")
 
+        if "target" in p:
+            self.target_hz = p["target"]
+        if "squelch" in p:
+            self.squelch_db = p["squelch"]
+
+        if "rate" in p:
+            self._configure_monitor()
+        elif "center" in p or "target" in p:
+            if self._mon_ok:
+                self.monitor.set_offset(self.target_hz - self.sdr.center_freq)
+
         if retune:
             self._flush = 2  # drop stale buffered samples
 
         if "rec_start" in p:
             self._open_recording(p["rec_start"])
+
+    def _configure_monitor(self):
+        try:
+            self.monitor.configure(float(self.sdr.sample_rate),
+                                   self.target_hz - self.sdr.center_freq)
+            self._mon_ok = True
+        except ValueError as e:
+            self._mon_ok = False
+            self.status.emit(f"Audio monitor off: {e}")
 
     def _open_recording(self, meta: dict):
         rec_dir = HERE / "recordings"
@@ -218,7 +223,7 @@ class SdrReader(QtCore.QThread):
             sample_rate=float(self.sdr.sample_rate),
             gain=str(self.sdr.gain),
             started=stamp,
-            tool=f"sdr_probe {VERSION}",
+            tool=f"smashDR sdr_probe {VERSION}",
         )
         with open(self._rec_path.with_suffix(".json"), "w") as f:
             json.dump(meta, f, indent=2)
@@ -233,7 +238,17 @@ class SdrReader(QtCore.QThread):
             self.status.emit(f"Saved {self._rec_path.name} ({mb:.1f} MB)")
         self._rec = None
 
+    def _channel_above_floor(self, spec, center, rate):
+        binw = rate / FFT_SIZE
+        c = int(round((self.target_hz - center) / binw + FFT_SIZE / 2))
+        h = max(1, int(np.ceil(CHAN_HALF_BW / binw)))
+        lo, hi = max(0, c - h), min(FFT_SIZE, c + h + 1)
+        if lo >= hi:
+            return -99.0
+        return float(spec[lo:hi].max() - np.median(spec))
+
     def run(self):
+        self._configure_monitor()
         while self._running:
             self._apply_pending()
             try:
@@ -256,11 +271,18 @@ class SdrReader(QtCore.QThread):
             iq = cu8_to_iq(raw)
             rms_db = 10.0 * np.log10(np.mean(iq.real ** 2 + iq.imag ** 2) + 1e-20)
             spec = power_spectrum_db(iq)
+            center = float(self.sdr.center_freq)
+            rate = float(self.sdr.sample_rate)
 
-            stats = {"clip": clip, "rms": rms_db,
+            snr = self._channel_above_floor(spec, center, rate)
+            sq_open = self.squelch_db <= 0 or snr >= self.squelch_db
+            if self._mon_ok:
+                pcm = self.monitor.process(iq, sq_open)
+                self.audio.emit(pcm.tobytes())
+
+            stats = {"clip": clip, "rms": rms_db, "sq_open": sq_open,
                      "rec_mb": self._rec_bytes / 1e6 if self._rec else None}
-            self.frame.emit(spec, float(self.sdr.center_freq),
-                            float(self.sdr.sample_rate), stats)
+            self.frame.emit(spec, center, rate, stats)
 
         self._close_recording()
 
@@ -269,20 +291,44 @@ class SdrReader(QtCore.QThread):
 # GUI
 # --------------------------------------------------------------------------
 class ProbeWindow(QtWidgets.QMainWindow):
-    def __init__(self, sdr: RtlSdr, args):
+    def __init__(self, sdr: RtlSdr, opts: dict):
         super().__init__()
-        self.setWindowTitle(f"SDR Probe {VERSION}")
-        self.resize(1200, 800)
+        self.setWindowTitle(f"smashDR {VERSION}")
+        self.resize(1200, 820)
+        self.opts = opts
 
-        self.target_hz = args.freq * 1e6
+        self.target_hz = opts["freq_mhz"] * 1e6
         self.center_hz = None
         self.rate_hz = None
         self.freqs_mhz = None
         self.avg = None
         self.wf = np.full((WF_ROWS, FFT_SIZE), -120.0, dtype=np.float32)
 
-        # ---- controls ----
-        self.freq_edit = QtWidgets.QLineEdit(f"{args.freq:.5f}")
+        self.reader = SdrReader(sdr, self.target_hz, opts["squelch_db"])
+
+        tabs = QtWidgets.QTabWidget()
+        tabs.addTab(self._build_receiver_tab(sdr), "Receiver")
+        tabs.addTab(self._build_settings_tab(), "Settings")
+        self.setCentralWidget(tabs)
+
+        # audio
+        self.audio_out = audio.AudioOut() if audio else None
+        if self.audio_out:
+            self.audio_out.set_volume((opts["volume"] / 100) ** 2)
+            self._fill_audio_devices(select_key=opts.get("audio_device_id"))
+        self.reader.audio.connect(self._on_audio)
+
+        self.reader.frame.connect(self.on_frame)
+        self.reader.status.connect(self.status_lbl.setText)
+        self._set_marker(self.target_hz)
+        self.reader.start()
+
+    # ======================================================================
+    # Receiver tab
+    # ======================================================================
+    def _build_receiver_tab(self, sdr):
+        opts = self.opts
+        self.freq_edit = QtWidgets.QLineEdit(f"{opts['freq_mhz']:.5f}")
         self.freq_edit.setFixedWidth(110)
         self.freq_edit.returnPressed.connect(self.tune)
         tune_btn = QtWidgets.QPushButton("Tune")
@@ -292,21 +338,37 @@ class ProbeWindow(QtWidgets.QMainWindow):
         self.gain_box.addItem("auto")
         for g in sdr.valid_gains_db:
             self.gain_box.addItem(f"{g:.1f}")
-        self.gain_box.setCurrentText("auto" if args.gain == "auto"
-                                     else self._closest_gain(sdr, float(args.gain)))
+        self.gain_box.setCurrentText("auto" if opts["gain"] == "auto"
+                                     else self._closest_gain(sdr, float(opts["gain"])))
         self.gain_box.currentTextChanged.connect(self.set_gain)
 
         self.rate_box = QtWidgets.QComboBox()
         for r in RATES_MSPS:
             self.rate_box.addItem(f"{r} MS/s", r * 1e6)
         self.rate_box.setCurrentIndex(
-            min(range(len(RATES_MSPS)), key=lambda i: abs(RATES_MSPS[i] - args.rate)))
+            min(range(len(RATES_MSPS)), key=lambda i: abs(RATES_MSPS[i] - opts["rate_msps"])))
         self.rate_box.currentIndexChanged.connect(self.set_rate)
 
         self.ppm_spin = QtWidgets.QSpinBox()
         self.ppm_spin.setRange(-100, 100)
-        self.ppm_spin.setValue(args.ppm)
+        self.ppm_spin.setValue(opts["ppm"])
         self.ppm_spin.valueChanged.connect(lambda v: self.reader.request(ppm=v))
+
+        self.sq_spin = QtWidgets.QSpinBox()
+        self.sq_spin.setRange(0, 60)
+        self.sq_spin.setSuffix(" dB")
+        self.sq_spin.setToolTip("Squelch: dB above noise floor. 0 = always open.")
+        self.sq_spin.setValue(int(opts["squelch_db"]))
+        self.sq_spin.valueChanged.connect(lambda v: self.reader.request(squelch=v))
+
+        self.vol_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.vol_slider.setRange(0, 100)
+        self.vol_slider.setFixedWidth(110)
+        self.vol_slider.setValue(int(opts["volume"]))
+        self.vol_slider.valueChanged.connect(self._set_volume)
+
+        self.mute_chk = QtWidgets.QCheckBox("Mute")
+        self.mute_chk.setChecked(bool(opts.get("mute", False)))
 
         self.rec_btn = QtWidgets.QPushButton("Record IQ")
         self.rec_btn.setCheckable(True)
@@ -316,11 +378,14 @@ class ProbeWindow(QtWidgets.QMainWindow):
         for w in (QtWidgets.QLabel("Freq MHz"), self.freq_edit, tune_btn,
                   QtWidgets.QLabel("Gain"), self.gain_box,
                   QtWidgets.QLabel("Rate"), self.rate_box,
-                  QtWidgets.QLabel("PPM"), self.ppm_spin, self.rec_btn):
+                  QtWidgets.QLabel("PPM"), self.ppm_spin,
+                  QtWidgets.QLabel("Squelch"), self.sq_spin,
+                  QtWidgets.QLabel("Vol"), self.vol_slider, self.mute_chk,
+                  self.rec_btn):
             bar.addWidget(w)
         bar.addStretch(1)
 
-        # ---- spectrum ----
+        # spectrum
         self.spec_plot = pg.PlotWidget()
         self.spec_plot.setLabel("bottom", "MHz")
         self.spec_plot.setLabel("left", "dBFS")
@@ -335,7 +400,7 @@ class ProbeWindow(QtWidgets.QMainWindow):
         self.marker.sigPositionChanged.connect(self._marker_moved)
         self.spec_plot.addItem(self.marker)
 
-        # ---- waterfall ----
+        # waterfall
         self.wf_plot = pg.PlotWidget()
         self.wf_plot.setXLink(self.spec_plot)
         self.wf_plot.hideAxis("left")
@@ -350,7 +415,6 @@ class ProbeWindow(QtWidgets.QMainWindow):
             p.scene().sigMouseClicked.connect(
                 lambda ev, plot=p: self._plot_clicked(ev, plot))
 
-        # ---- readout ----
         self.info = QtWidgets.QLabel("Starting...")
         self.info.setFont(QtGui.QFont("Consolas", 11))
         self.status_lbl = QtWidgets.QLabel("")
@@ -365,18 +429,89 @@ class ProbeWindow(QtWidgets.QMainWindow):
         lay.addWidget(split, 1)
         lay.addWidget(self.info)
         lay.addWidget(self.status_lbl)
-        central = QtWidgets.QWidget()
-        central.setLayout(lay)
-        self.setCentralWidget(central)
+        w = QtWidgets.QWidget()
+        w.setLayout(lay)
+        return w
 
-        # ---- reader ----
-        self.reader = SdrReader(sdr)
-        self.reader.frame.connect(self.on_frame)
-        self.reader.status.connect(self.status_lbl.setText)
-        self._set_marker(self.target_hz)
-        self.reader.start()
+    # ======================================================================
+    # Settings tab
+    # ======================================================================
+    def _build_settings_tab(self):
+        self.audio_dev_box = QtWidgets.QComboBox()
+        self.audio_dev_box.setMinimumWidth(380)
+        self.audio_dev_box.currentIndexChanged.connect(self._audio_device_chosen)
+        refresh = QtWidgets.QPushButton("Refresh")
+        refresh.clicked.connect(lambda: self._fill_audio_devices(
+            select_key=self.opts.get("audio_device_id")))
+        tone = QtWidgets.QPushButton("Test tone")
+        tone.clicked.connect(lambda: self.audio_out and self.audio_out.test_tone())
+        self.audio_status = QtWidgets.QLabel("")
+        self.audio_status.setWordWrap(True)
 
-    # ---- helpers ----
+        dev_row = QtWidgets.QHBoxLayout()
+        dev_row.addWidget(self.audio_dev_box, 1)
+        dev_row.addWidget(refresh)
+        dev_row.addWidget(tone)
+
+        audio_box = QtWidgets.QGroupBox("Audio output")
+        form = QtWidgets.QFormLayout(audio_box)
+        form.addRow("Device", dev_row)
+        form.addRow("", self.audio_status)
+        if audio is None:
+            self.audio_status.setText("QtMultimedia not available - audio disabled.")
+            self.audio_dev_box.setEnabled(False)
+
+        lay = QtWidgets.QVBoxLayout()
+        lay.addWidget(audio_box)
+        lay.addStretch(1)
+        w = QtWidgets.QWidget()
+        w.setLayout(lay)
+        return w
+
+    def _fill_audio_devices(self, select_key=None):
+        if not self.audio_out:
+            return
+        self._audio_devs = audio.output_devices()
+        default_key = audio.device_key(audio.default_device())
+        self.audio_dev_box.blockSignals(True)
+        self.audio_dev_box.clear()
+        idx = 0
+        for i, dev in enumerate(self._audio_devs):
+            key = audio.device_key(dev)
+            label = dev.description() + ("  (system default)" if key == default_key else "")
+            self.audio_dev_box.addItem(label)
+            if key == (select_key or default_key):
+                idx = i
+        self.audio_dev_box.blockSignals(False)
+        if self._audio_devs:
+            self.audio_dev_box.setCurrentIndex(idx)
+            self._audio_device_chosen(idx)
+        else:
+            self.audio_status.setText("No audio output devices found.")
+
+    def _audio_device_chosen(self, idx):
+        if not self.audio_out or idx < 0 or idx >= len(self._audio_devs):
+            return
+        dev = self._audio_devs[idx]
+        try:
+            desc = self.audio_out.open(dev)
+            self.audio_status.setText(f"Playing on: {desc}")
+            self.opts["audio_device_id"] = audio.device_key(dev)
+            self.opts["audio_device_name"] = dev.description()
+        except Exception as e:
+            self.audio_status.setText(f"Could not open {dev.description()}: {e}")
+
+    def _on_audio(self, pcm: bytes):
+        if self.audio_out and not self.mute_chk.isChecked():
+            self.audio_out.write(pcm)
+
+    def _set_volume(self, v):
+        if self.audio_out:
+            self.audio_out.set_volume((v / 100) ** 2)
+
+    # ======================================================================
+    # helpers
+    # ======================================================================
     @staticmethod
     def _closest_gain(sdr, g):
         return f"{min(sdr.valid_gains_db, key=lambda x: abs(x - g)):.1f}"
@@ -394,6 +529,7 @@ class ProbeWindow(QtWidgets.QMainWindow):
         self.wf_marker.setValue(mhz)
         self.chan_region.setRegion((mhz - CHAN_HALF_BW / 1e6, mhz + CHAN_HALF_BW / 1e6))
         self.freq_edit.setText(f"{mhz:.5f}")
+        self.reader.request(target=hz)
 
     def _marker_moved(self):
         self._set_marker(self.marker.value() * 1e6)
@@ -452,64 +588,98 @@ class ProbeWindow(QtWidgets.QMainWindow):
         floor = float(np.median(spec))
         self.wf_img.setImage(self.wf, autoLevels=False, levels=(floor - 5, floor + 45))
 
-        # channel readout
         mask = np.abs(self.freqs_mhz * 1e6 - self.target_hz) <= CHAN_HALF_BW
         if mask.any():
             peak = float(self.avg[mask].max())
             chan_pwr = 10 * np.log10(np.sum(10 ** (self.avg[mask] / 10)))
-            chan_txt = (f"chan pwr {chan_pwr:6.1f} dBFS   peak {peak:6.1f}   "
+            chan_txt = (f"chan {chan_pwr:6.1f} dBFS   peak {peak:6.1f}   "
                         f"above floor {peak - floor:5.1f} dB")
         else:
             chan_txt = "marker outside tuned span - press Tune"
 
+        sq_txt = "SQ OPEN " if stats["sq_open"] else "SQ shut "
         clip_txt = f"clip {stats['clip']:.3f}%"
         if stats["clip"] > 0.1:
             clip_txt += "  << OVERLOAD, lower gain"
         rec_txt = f"   REC {stats['rec_mb']:.0f} MB" if stats["rec_mb"] is not None else ""
-        self.info.setText(f"{self.target_hz / 1e6:.5f} MHz   {chan_txt}   "
-                          f"floor {floor:6.1f}   rms {stats['rms']:5.1f} dBFS   "
-                          f"{clip_txt}{rec_txt}")
+        self.info.setText(f"{self.target_hz / 1e6:.5f} MHz   {sq_txt}  {chan_txt}   "
+                          f"floor {floor:6.1f}   {clip_txt}{rec_txt}")
 
+    # ---- shutdown ----
     def closeEvent(self, ev):
         self.reader.stop()
         self.reader.wait(2000)
+        if self.audio_out:
+            self.audio_out.close()
+        self.opts.update(
+            freq_mhz=round(self.target_hz / 1e6, 6),
+            gain=self.gain_box.currentText(),
+            rate_msps=self.rate_box.currentData() / 1e6,
+            ppm=self.ppm_spin.value(),
+            squelch_db=self.sq_spin.value(),
+            volume=self.vol_slider.value(),
+            mute=self.mute_chk.isChecked(),
+        )
+        try:
+            cfg.save(self.opts)
+        except OSError as e:
+            print("[!] Could not save settings:", e)
         super().closeEvent(ev)
 
 
 # --------------------------------------------------------------------------
-def open_sdr(args) -> RtlSdr:
+DEFAULTS = {"freq_mhz": 851.0, "gain": "auto", "rate_msps": 2.4, "ppm": 0,
+            "squelch_db": 10, "volume": 60, "mute": False}
+
+
+def resolve_options(args) -> dict:
+    opts = dict(DEFAULTS)
+    opts.update(cfg.load())
+    if args.freq is not None:
+        opts["freq_mhz"] = args.freq
+    if args.gain is not None:
+        opts["gain"] = args.gain
+    if args.rate is not None:
+        opts["rate_msps"] = args.rate
+    if args.ppm is not None:
+        opts["ppm"] = args.ppm
+    return opts
+
+
+def open_sdr(opts, device_index=0) -> RtlSdr:
     try:
-        sdr = RtlSdr(device_index=args.device)
+        sdr = RtlSdr(device_index=device_index)
     except Exception as e:
         print("\n[!] Could not open the RTL-SDR:", e)
         print("    - Is another SDR app (SDR++, SDRTrunk, ...) holding it?")
         print("    - Is the WinUSB driver installed? Zadig -> Options -> List All")
-        print("      Devices -> 'Bulk-In, Interface (Interface 0)' -> WinUSB.\n")
+        print("      Devices -> 'Blog V4' / 'Bulk-In, Interface (Interface 0)' -> WinUSB.\n")
         sys.exit(1)
 
-    rate = args.rate * 1e6
+    rate = float(opts["rate_msps"]) * 1e6
     sdr.sample_rate = rate
-    sdr.center_freq = args.freq * 1e6 + min(300e3, rate * 0.2)
-    sdr.gain = "auto" if args.gain == "auto" else float(args.gain)
-    if args.ppm:
-        sdr.freq_correction = args.ppm
+    sdr.center_freq = float(opts["freq_mhz"]) * 1e6 + min(300e3, rate * 0.2)
+    sdr.gain = "auto" if opts["gain"] == "auto" else float(opts["gain"])
+    if opts["ppm"]:
+        sdr.freq_correction = int(opts["ppm"])
     print(f"[ok] RTL-SDR open: {sdr.sample_rate / 1e6:.3f} MS/s, "
           f"centre {sdr.center_freq / 1e6:.5f} MHz, gain {sdr.gain}")
     return sdr
 
 
 def main():
-    ap = argparse.ArgumentParser(description="RTL-SDR probe: spectrum, waterfall, IQ recording")
-    ap.add_argument("--freq", type=float, default=851.0, help="target frequency in MHz")
-    ap.add_argument("--rate", type=float, default=2.4, help="sample rate in MS/s")
-    ap.add_argument("--gain", default="auto", help="'auto' or dB")
-    ap.add_argument("--ppm", type=int, default=0)
+    ap = argparse.ArgumentParser(description="smashDR receiver")
+    ap.add_argument("--freq", type=float, help="target frequency in MHz")
+    ap.add_argument("--rate", type=float, help="sample rate in MS/s")
+    ap.add_argument("--gain", help="'auto' or dB")
+    ap.add_argument("--ppm", type=int)
     ap.add_argument("--device", type=int, default=0)
     args = ap.parse_args()
 
-    sdr = open_sdr(args)
+    opts = resolve_options(args)
+    sdr = open_sdr(opts, args.device)
     app = QtWidgets.QApplication(sys.argv)
-    win = ProbeWindow(sdr, args)
+    win = ProbeWindow(sdr, opts)
     win.show()
     code = app.exec()
     sdr.close()

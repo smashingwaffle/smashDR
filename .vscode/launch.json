@@ -6,7 +6,6 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--freq", "851.0", "--gain", "auto"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "preLaunchTask": "git pull"

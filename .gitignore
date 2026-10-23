@@ -19,6 +19,10 @@ recordings/
 *.cu8
 *.cf32
 
+# Local settings
+settings.json
+settings.tmp
+
 # OS / editor
 .DS_Store
 Thumbs.db

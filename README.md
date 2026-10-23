@@ -3,7 +3,8 @@
 A P25 / DMR decoder for the RTL-SDR Blog V4, in Python + PyQt6.
 One app, one install, no scattered plugins.
 
-**Status:** step 1 - SDR probe (spectrum, waterfall, IQ recording). Nothing is decoded yet.
+**Status:** step 1 - receiver probe: spectrum, waterfall, NFM audio monitor, IQ recording.
+Nothing digital is decoded yet.
 
 ## Setup (Windows)
 
@@ -23,11 +24,13 @@ pip install -r requirements.txt
 ## Run
 
 ```
-python main.py --freq 851.0125
-python main.py --freq 446.0 --gain 30 --rate 1.2
+python main.py                     # uses last frequency/gain/audio settings
+python main.py --freq 851.0125     # command line overrides saved settings
 ```
 
-Or press F5 in VSCode (pulls the latest code first).
+Or press F5 in VSCode (pulls the latest code first). Settings (frequency,
+gain, rate, squelch, volume, audio device) are saved to `settings.json`
+on close. Pick the audio output device on the **Settings** tab.
 
 Click a signal to put the 12.5 kHz channel marker on it. Set the gain so
 `clip` stays at 0%. **Record IQ** writes `recordings/*.cu8` plus a `.json`
