@@ -11,6 +11,7 @@ dist/
 
 # Native libraries (dropped in locally from the rtl-sdr-blog release)
 *.dll
+*.exe
 lib/
 
 # IQ recordings - large, keep local
