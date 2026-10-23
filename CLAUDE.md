@@ -32,6 +32,10 @@ UX comes after the decode chain works.
   decimator), Demod (NFM/AM/WFM -> 48 kHz, gate, limiter, click-free switches)
 - `widgets.py` FreqDisplay (VFO) and LevelMeter
 - `bandplan.py` simplified US band plan, lookup() and in_span()
+- `presets.py` preset store (presets.json local, seeded from
+  presets_default.json in git) + PresetsWindow (second-screen button grid)
+- Stefaan is in LA (90032); presets and examples should be LA-area, Mt Wilson
+  is his main repeater site. Never seed other regions' frequencies.
 - `audio.py` QtMultimedia output, converts to device's preferred format
 - `settings.py` settings.json store (not in git)
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,

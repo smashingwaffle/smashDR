@@ -26,3 +26,5 @@ settings.tmp
 # OS / editor
 .DS_Store
 Thumbs.db
+presets.json
+presets.tmp

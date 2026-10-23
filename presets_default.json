@@ -1,0 +1,265 @@
+{
+ "presets": [
+  {
+   "name": "W6MEP",
+   "freq_hz": 147240000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone + 67.0, open (RepeaterBook)"
+  },
+  {
+   "name": "K6VGP",
+   "freq_hz": 147360000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone + 103.5, private (RepeaterBook)"
+  },
+  {
+   "name": "WD8CIK",
+   "freq_hz": 445140000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone - 127.3, private, AllStar/EchoLink (RepeaterBook)"
+  },
+  {
+   "name": "WD6ABC",
+   "freq_hz": 445540000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone - 123.0, open, also Fusion (RepeaterBook)"
+  },
+  {
+   "name": "WA6LWW",
+   "freq_hz": 446780000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
+  },
+  {
+   "name": "446.94 link",
+   "freq_hz": 446940000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone -, private, EchoLink/IRLP (RepeaterBook)"
+  },
+  {
+   "name": "KB6COP",
+   "freq_hz": 447240000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone - 100.0, closed (RepeaterBook)"
+  },
+  {
+   "name": "K6JTH",
+   "freq_hz": 448100000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
+  },
+  {
+   "name": "W6ATN",
+   "freq_hz": 448420000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
+  },
+  {
+   "name": "W6JYP",
+   "freq_hz": 448880000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
+  },
+  {
+   "name": "W6THC",
+   "freq_hz": 448960000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
+  },
+  {
+   "name": "N6YN",
+   "freq_hz": 449480000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
+  },
+  {
+   "name": "NO6BS",
+   "freq_hz": 449700000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone - 131.8, open (RepeaterBook)"
+  },
+  {
+   "name": "WA6TTL",
+   "freq_hz": 449720000,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 5000,
+   "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
+  },
+  {
+   "name": "N6EX",
+   "freq_hz": 927987500,
+   "mode": "NFM",
+   "group": "Mt Wilson",
+   "step_hz": 12500,
+   "note": "Mt Wilson repeater, offset/tone -, open, AllStar (RepeaterBook)"
+  },
+  {
+   "name": "El Monte twr",
+   "freq_hz": 121200000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000,
+   "note": "San Gabriel Valley Airport tower, closest to 90032 (0800-2000)"
+  },
+  {
+   "name": "El Monte ATIS",
+   "freq_hz": 118750000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000
+  },
+  {
+   "name": "Burbank twr",
+   "freq_hz": 118700000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000
+  },
+  {
+   "name": "Burbank ATIS",
+   "freq_hz": 134500000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000
+  },
+  {
+   "name": "LAX twr north",
+   "freq_hz": 133900000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000
+  },
+  {
+   "name": "LAX twr south",
+   "freq_hz": 120950000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000
+  },
+  {
+   "name": "LAX ATIS arr",
+   "freq_hz": 133800000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000
+  },
+  {
+   "name": "SoCal approach",
+   "freq_hz": 124300000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000,
+   "note": "LAX arrivals"
+  },
+  {
+   "name": "Guard",
+   "freq_hz": 121500000,
+   "mode": "AM",
+   "group": "Air",
+   "step_hz": 25000,
+   "note": "Aviation emergency"
+  },
+  {
+   "name": "2m simplex",
+   "freq_hz": 146520000,
+   "mode": "NFM",
+   "group": "Ham",
+   "step_hz": 5000,
+   "note": "National 2 m calling"
+  },
+  {
+   "name": "70cm simplex",
+   "freq_hz": 446000000,
+   "mode": "NFM",
+   "group": "Ham",
+   "step_hz": 5000,
+   "note": "National 70 cm calling"
+  },
+  {
+   "name": "APRS",
+   "freq_hz": 144390000,
+   "mode": "NFM",
+   "group": "Ham",
+   "step_hz": 5000
+  },
+  {
+   "name": "ISS downlink",
+   "freq_hz": 145800000,
+   "mode": "NFM",
+   "group": "Ham",
+   "step_hz": 5000
+  },
+  {
+   "name": "NOAA LA",
+   "freq_hz": 162550000,
+   "mode": "NFM",
+   "group": "Weather",
+   "step_hz": 25000,
+   "note": "KWO37 Los Angeles"
+  },
+  {
+   "name": "NOAA Malibu",
+   "freq_hz": 162425000,
+   "mode": "NFM",
+   "group": "Weather",
+   "step_hz": 25000,
+   "note": "KWL22 Malibu marine"
+  },
+  {
+   "name": "Marine ch 16",
+   "freq_hz": 156800000,
+   "mode": "NFM",
+   "group": "Marine",
+   "step_hz": 25000,
+   "note": "Distress and calling"
+  },
+  {
+   "name": "KCRW",
+   "freq_hz": 89900000,
+   "mode": "WFM",
+   "group": "FM",
+   "step_hz": 200000
+  },
+  {
+   "name": "LAist 89.3",
+   "freq_hz": 89300000,
+   "mode": "WFM",
+   "group": "FM",
+   "step_hz": 200000
+  },
+  {
+   "name": "KROQ",
+   "freq_hz": 106700000,
+   "mode": "WFM",
+   "group": "FM",
+   "step_hz": 200000
+  }
+ ]
+}

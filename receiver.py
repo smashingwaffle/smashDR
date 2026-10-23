@@ -34,7 +34,7 @@ import settings as cfg
 from dsp import FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -119,6 +119,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: E402
 import pyqtgraph as pg  # noqa: E402
 
 from widgets import FreqDisplay, LevelMeter  # noqa: E402
+from presets import PresetsWindow  # noqa: E402
 
 try:
     import audio  # noqa: E402
@@ -472,9 +473,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reader.frame.connect(self.on_frame)
         self.reader.status.connect(self.status_lbl.setText)
 
+        self.presets_win = None
         self._apply_mode_ui()
         self._tune(self.target_hz, apply_band_defaults=False)
         self.reader.start()
+        if opts.get("presets_open"):
+            QtCore.QTimer.singleShot(0, self.show_presets)
 
     # ======================================================================
     # Receiver tab
@@ -506,6 +510,10 @@ class MainWindow(QtWidgets.QMainWindow):
             mode_row.addWidget(b)
             b.clicked.connect(lambda _c, mm=m: self._set_mode(mm))
 
+        self.presets_btn = QtWidgets.QPushButton("Open presets")
+        self.presets_btn.setToolTip("Preset buttons in their own window (put it on a second screen)")
+        self.presets_btn.clicked.connect(self.show_presets)
+
         row1 = QtWidgets.QHBoxLayout()
         row1.addWidget(self.vfo)
         row1.addWidget(mhz)
@@ -513,6 +521,8 @@ class MainWindow(QtWidgets.QMainWindow):
         row1.addWidget(self.band_lbl)
         row1.addStretch(1)
         row1.addLayout(mode_row)
+        row1.addSpacing(12)
+        row1.addWidget(self.presets_btn)
 
         # --- row 2: step, squelch, meter, volume, mute, record ---
         self.step_box = QtWidgets.QComboBox()
@@ -836,6 +846,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wf_marker.setValue(mhz)
         self._update_region()
         self.reader.request(target=float(hz))
+        if self.presets_win is not None:
+            self.presets_win.set_active(hz, self.mode)
 
         # re-centre the hardware if the channel would fall off the span
         if self.center_hz is not None and self.rate_hz:
@@ -868,6 +880,38 @@ class MainWindow(QtWidgets.QMainWindow):
         if ev.button() == QtCore.Qt.MouseButton.LeftButton and \
                 vb.sceneBoundingRect().contains(ev.scenePos()):
             self._tune(vb.mapSceneToView(ev.scenePos()).x() * 1e6, snap=True)
+
+    # ======================================================================
+    # Presets window
+    # ======================================================================
+    def show_presets(self):
+        if self.presets_win is None:
+            self.presets_win = PresetsWindow(self._current_for_preset)
+            self.presets_win.tune_requested.connect(self._tune_preset)
+            geo = self.opts.get("presets_geometry")
+            if geo:
+                try:
+                    self.presets_win.restoreGeometry(QtCore.QByteArray.fromHex(geo.encode()))
+                except Exception:
+                    pass
+            self.presets_win.set_active(self.target_hz, self.mode)
+        self.presets_win.show()
+        self.presets_win.raise_()
+        self.presets_win.activateWindow()
+
+    def _current_for_preset(self) -> dict:
+        return {"freq_hz": int(self.target_hz), "mode": self.mode,
+                "step_hz": int(self.step_hz), "squelch_db": int(self.sq_slider.value())}
+
+    def _tune_preset(self, p: dict):
+        if p.get("mode") in MODES and p["mode"] != self.mode:
+            self._set_mode(p["mode"])
+        if p.get("step_hz"):
+            self._select_step(p["step_hz"])
+            self._set_step(p["step_hz"])
+        if p.get("squelch_db") is not None:
+            self.sq_slider.setValue(int(p["squelch_db"]))
+        self._tune(p["freq_hz"], apply_band_defaults=False)
 
     # ======================================================================
     # Controls
@@ -1022,6 +1066,12 @@ class MainWindow(QtWidgets.QMainWindow):
     # Shutdown
     # ======================================================================
     def closeEvent(self, ev):
+        if self.presets_win is not None:
+            self.opts["presets_open"] = self.presets_win.isVisible()
+            self.opts["presets_geometry"] = bytes(self.presets_win.saveGeometry().toHex()).decode()
+            self.presets_win.close()
+        else:
+            self.opts["presets_open"] = False
         self.reader.stop()
         self.reader.wait(3000)
         if self.audio_out:
