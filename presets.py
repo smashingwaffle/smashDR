@@ -57,6 +57,8 @@ def _clean(p: dict):
                 pass
     if p.get("note"):
         out["note"] = str(p["note"])
+    if p.get("digital"):
+        out["digital"] = str(p["digital"])
     return out
 
 
@@ -198,10 +200,17 @@ def parse_radioreference(text: str, group: str = "Imported", group_by_tag: bool 
         if f is None:
             continue
 
-        mode_u = rr_mode.upper().replace(" ", "")
+        mode_raw = rr_mode.replace(" ", "")
+        mode_u = mode_raw.upper()
+        digital = None
         if any(m in mode_u for m in DIGITAL_MARKERS):
-            skipped.append(f"{f:.4f} {alpha or desc} ({rr_mode})")
-            continue
+            # RadioReference: trailing uppercase E = encrypted, lowercase e = partly encrypted
+            if mode_raw.endswith("E") and mode_u.rstrip("E") != mode_u:
+                skipped.append(f"{f:.4f} {alpha or desc} ({rr_mode}, encrypted)")
+                continue
+            digital = mode_u.rstrip("E")
+            if mode_raw.endswith("e"):
+                digital += " (part enc)"
         mode = MODE_MAP.get(mode_u, "NFM")
         freq_hz = int(round(f * 1e6))
         name = (alpha or desc or f"{f:.4f}")[:18]
@@ -211,6 +220,8 @@ def parse_radioreference(text: str, group: str = "Imported", group_by_tag: bool 
              "step_hz": _default_step(freq_hz, mode)}
         if note:
             p["note"] = note
+        if digital:
+            p["digital"] = digital
         out.append(p)
     return out, skipped
 
@@ -224,7 +235,7 @@ def groups_in_order(presets: list) -> list:
 
 
 def preset_subtitle(p: dict) -> str:
-    return f"{p['freq_hz'] / 1e6:.4f} {p['mode']}"
+    return f"{p['freq_hz'] / 1e6:.4f} {p.get('digital') or p['mode']}"
 
 
 # --------------------------------------------------------------------------
@@ -315,6 +326,11 @@ class PresetDialog(QtWidgets.QDialog):
         self.group.addItems(groups)
         self.group.setCurrentText(preset.get("group", groups[0] if groups else "General"))
         self.note = QtWidgets.QLineEdit(preset.get("note", ""))
+        self.digital = QtWidgets.QComboBox()
+        self.digital.setEditable(True)
+        self.digital.addItems(["", "P25", "P25 CC", "P25 Phase II CC", "DMR"])
+        self.digital.setCurrentText(preset.get("digital", ""))
+        self.digital.setToolTip("Digital mode label (for the upcoming decoders). Empty = analog")
 
         form = QtWidgets.QFormLayout()
         form.addRow("Name", self.name)
@@ -323,6 +339,7 @@ class PresetDialog(QtWidgets.QDialog):
         form.addRow("Step", self.step)
         form.addRow("Squelch", self.squelch)
         form.addRow("Group", self.group)
+        form.addRow("Digital", self.digital)
         form.addRow("Note", self.note)
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok |
@@ -344,6 +361,8 @@ class PresetDialog(QtWidgets.QDialog):
             p["squelch_db"] = self.squelch.value()
         if self.note.text().strip():
             p["note"] = self.note.text().strip()
+        if self.digital.currentText().strip():
+            p["digital"] = self.digital.currentText().strip()
         return p
 
 
@@ -357,7 +376,8 @@ class ImportDialog(QtWidgets.QDialog):
         help_lbl = QtWidgets.QLabel(
             "On a RadioReference page, select the table rows you want (or the whole "
             "table including its header), copy, and paste here. A CSV export works too. "
-            "Digital channels (P25, DMR, ...) are skipped until smashDR can decode them.")
+            "Clear digital channels (P25, DMR, ...) are kept and labelled; encrypted ones "
+            "(P25E etc.) are skipped.")
         help_lbl.setWordWrap(True)
         self.text = QtWidgets.QPlainTextEdit()
         self.text.setPlaceholderText("483.750\t\tRM\t186.2 PL\tLAC U-1\tCountywide Dispatch\tFMN\tFire Dispatch")
@@ -401,7 +421,7 @@ class ImportDialog(QtWidgets.QDialog):
             msg += ": " + ", ".join(f"{p['name']} {p['freq_hz'] / 1e6:.4f}" for p in ps[:4])
             msg += " ..." if len(ps) > 4 else ""
         if skipped:
-            msg += f"\nSkipping {len(skipped)} digital: " + ", ".join(skipped[:3])
+            msg += f"\nSkipping {len(skipped)} encrypted: " + ", ".join(skipped[:3])
             msg += " ..." if len(skipped) > 3 else ""
         self.preview.setText(msg)
         self.buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setEnabled(bool(ps))
@@ -421,6 +441,8 @@ class PresetButton(QtWidgets.QPushButton):
         f.setPointSize(pt)
         self.setFont(f)
         self.setText(f"{preset['name']}\n{preset_subtitle(preset)}")
+        if preset.get("digital"):
+            self.setProperty("digital", "true")
         tip = f"{preset['name']}  ·  {preset_subtitle(preset)}"
         if preset.get("note"):
             tip += f"\n{preset['note']}"
@@ -437,6 +459,7 @@ class PresetsWindow(QtWidgets.QWidget):
         QPushButton { text-align: left; padding: 3px 8px; }
         QPushButton:checked { background: palette(highlight); color: palette(highlighted-text); }
         QToolButton#groupHeader { border: none; text-align: left; padding: 4px 2px; }
+        QPushButton[digital="true"] { border-left: 4px solid #8e7cc3; }
     """
 
     def __init__(self, get_current, parent=None):
@@ -640,7 +663,7 @@ class PresetsWindow(QtWidgets.QWidget):
             self, "Import",
             f"Added {len(added)} preset(s)." +
             (f" {dupes} already existed in that group." if dupes else "") +
-            (f" Skipped {len(skipped)} digital channel(s)." if skipped else ""))
+            (f" Skipped {len(skipped)} encrypted channel(s)." if skipped else ""))
 
     def _context_menu(self, btn, pos):
         p = btn.preset

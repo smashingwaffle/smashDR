@@ -10,7 +10,9 @@
 ## Project
 - Own P25 / DMR decoder for an RTL-SDR Blog V4 on Windows, Python + PyQt6.
 - Goal: one installer, everything bundled, a UI that doesn't fight you.
-- Unencrypted traffic only. No decryption work.
+- Clear (unencrypted) digital traffic only: P25/DMR in the clear is the goal.
+  Encrypted (RR modes P25E / D Enc / DMRE) is never targeted, no key or
+  decryption work. Presets mark digital channels with a `digital` field.
 - A Uniden SDS200 is available as ground truth when debugging decodes.
 
 ## Build order

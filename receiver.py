@@ -34,7 +34,7 @@ import settings as cfg
 from dsp import FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -938,6 +938,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if p.get("squelch_db") is not None:
             self.sq_slider.setValue(int(p["squelch_db"]))
         self._tune(p["freq_hz"], apply_band_defaults=False)
+        if p.get("digital"):
+            self.status_lbl.setText(
+                f"{p['name']} is {p['digital']}: the decoder isn't built yet, so for now "
+                "you'll see the signal and hear digital noise in NFM.")
+        else:
+            self.status_lbl.setText(f"{p['name']}" + (f"  ·  {p['note']}" if p.get("note") else ""))
 
     # ======================================================================
     # Controls
