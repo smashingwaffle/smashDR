@@ -61,14 +61,60 @@ def _setup_dll_path():
                     pass
 
 
+def _pe_arch(path: Path) -> str:
+    """Read the machine type from a DLL's PE header."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0x3C)
+            pe_off = int.from_bytes(f.read(4), "little")
+            f.seek(pe_off + 4)
+            machine = int.from_bytes(f.read(2), "little")
+        return {0x8664: "x64", 0x14C: "x86 (32-bit)", 0xAA64: "ARM64"}.get(machine, hex(machine))
+    except OSError:
+        return "unreadable"
+
+
+def _diagnose_rtlsdr_dll():
+    """Explain exactly why rtlsdr.dll won't load. Returns None if it loads."""
+    import ctypes
+    import platform
+
+    dll = next((d / "rtlsdr.dll" for d in (HERE, HERE / "lib")
+                if (d / "rtlsdr.dll").exists()), None)
+    if dll is None:
+        return (f"rtlsdr.dll is not in {HERE} or {HERE / 'lib'}.\n"
+                "    Copy rtlsdr.dll, msvcr100.dll and pthreadVC2.dll there.")
+
+    arch = _pe_arch(dll)
+    py_arch = "x64" if platform.architecture()[0] == "64bit" else "x86 (32-bit)"
+    if arch != py_arch:
+        return (f"{dll} is an {arch} DLL but Python is {py_arch}.\n"
+                "    Use the files from the x64 folder of the rtl-sdr-blog Release.zip.")
+
+    missing = [n for n in ("msvcr100.dll", "pthreadVC2.dll")
+               if not (dll.parent / n).exists()]
+    try:
+        ctypes.CDLL(str(dll))
+    except OSError as e:
+        msg = f"{dll} found ({arch}) but Windows refused to load it: {e}"
+        if missing:
+            msg += f"\n    Missing next to it: {', '.join(missing)}"
+        return msg
+    return None
+
+
 _setup_dll_path()
 
 try:
     from rtlsdr import RtlSdr
 except Exception as e:  # missing DLL shows up as ImportError/OSError
     print("\n[!] Could not load librtlsdr:", e)
-    print("    Put rtlsdr.dll, msvcr100.dll and pthreadVC2.dll (x64, from the rtl-sdr-blog")
-    print("    GitHub release) next to this script or in a 'lib' folder.\n")
+    reason = _diagnose_rtlsdr_dll() if sys.platform == "win32" else None
+    if reason:
+        print("    " + reason + "\n")
+    else:
+        print("    rtlsdr.dll itself loads fine, so pyrtlsdr can't find it.")
+        print(f"    Folder searched: {HERE}\n")
     sys.exit(1)
 
 from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: E402
