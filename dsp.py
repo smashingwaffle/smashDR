@@ -149,23 +149,24 @@ class NfmMonitor:
         a *= self._gate_curve(len(a), open_)
         return (self._soft_limit(a) * 32767).astype(np.int16)
 
-    def _gate_curve(self, n: int, open_: bool) -> np.ndarray:
-        """Per-sample gain: muted during warm-up, ramped on squelch changes."""
-        g = np.empty(n, dtype=np.float32)
-        mute = min(n, self.warm_left)
-        g[:mute] = 0.0
-        self.warm_left -= mute
-        if mute:
-            self.gate = 0.0
-        rest = n - mute
-        if rest:
-            target = 1.0 if open_ else 0.0
-            step = 1.0 / (self.RAMP_SEC * AUDIO_RATE)
-            k = np.arange(1, rest + 1, dtype=np.float32) * step
-            g[mute:] = (np.minimum(self.gate + k, target) if target > self.gate
-                        else np.maximum(self.gate - k, target))
-            self.gate = float(g[-1])
+    def _ramp(self, n: int, target: float) -> np.ndarray:
+        step = 1.0 / (self.RAMP_SEC * AUDIO_RATE)
+        k = np.arange(1, n + 1, dtype=np.float32) * step
+        g = (np.minimum(self.gate + k, target) if target > self.gate
+             else np.maximum(self.gate - k, target)).astype(np.float32)
+        self.gate = float(g[-1])
         return g
+
+    def _gate_curve(self, n: int, open_: bool) -> np.ndarray:
+        """Per-sample gain: fades to 0 for warm-up/mute, ramps on squelch changes."""
+        mute = min(n, self.warm_left)
+        self.warm_left -= mute
+        parts = []
+        if mute:
+            parts.append(self._ramp(mute, 0.0))
+        if n - mute:
+            parts.append(self._ramp(n - mute, 1.0 if open_ else 0.0))
+        return np.concatenate(parts)
 
     def _soft_limit(self, a: np.ndarray) -> np.ndarray:
         """Linear below the knee, smooth tanh approach to full scale above it."""
