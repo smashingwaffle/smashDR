@@ -41,6 +41,16 @@ Set the gain (Settings tab) so `clip` stays at 0%. **Record IQ** writes `recordi
 sidecar; those captures are what the decoder stages are developed against.
 2.4 MS/s is about 290 MB per minute; 0.96 MS/s is plenty for one channel.
 
+## Presets
+
+**Open presets** opens a separate window (made for a second screen; the first
+time it fills your secondary monitor, after that it remembers where you put it).
+Groups collapse; click a preset to tune, right-click to edit. **Import…**
+takes rows copied from a RadioReference table: select the rows (with or
+without the header), copy, paste. Digital channels are skipped for now.
+Your presets live in `presets.json` (not in git); new defaults added to
+`presets_default.json` merge in without undoing your deletions.
+
 ## Scope
 
 Unencrypted traffic only.

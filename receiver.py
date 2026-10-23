@@ -34,7 +34,7 @@ import settings as cfg
 from dsp import FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -444,7 +444,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, sdr: RtlSdr, opts: dict):
         super().__init__()
         self.setWindowTitle(f"smashDR {VERSION}")
-        self.resize(1250, 860)
+        self._place_main_window(opts.get("main_geometry"))
         self.sdr = sdr
         self.opts = opts
 
@@ -888,16 +888,42 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.presets_win is None:
             self.presets_win = PresetsWindow(self._current_for_preset)
             self.presets_win.tune_requested.connect(self._tune_preset)
-            geo = self.opts.get("presets_geometry")
-            if geo:
-                try:
-                    self.presets_win.restoreGeometry(QtCore.QByteArray.fromHex(geo.encode()))
-                except Exception:
-                    pass
+            if not self._restore(self.presets_win, self.opts.get("presets_geometry")):
+                self._place_presets_window(self.presets_win)
             self.presets_win.set_active(self.target_hz, self.mode)
         self.presets_win.show()
         self.presets_win.raise_()
         self.presets_win.activateWindow()
+
+    @staticmethod
+    def _restore(win, hex_geo) -> bool:
+        if not hex_geo:
+            return False
+        try:
+            return bool(win.restoreGeometry(QtCore.QByteArray.fromHex(hex_geo.encode())))
+        except Exception:
+            return False
+
+    def _place_main_window(self, hex_geo):
+        """Last position if known, else big and centred on the primary screen."""
+        if self._restore(self, hex_geo):
+            return
+        scr = QtGui.QGuiApplication.primaryScreen()
+        if scr is None:
+            self.resize(1600, 1000)
+            return
+        g = scr.availableGeometry()
+        w, h = int(g.width() * 0.85), int(g.height() * 0.88)
+        self.setGeometry(g.x() + (g.width() - w) // 2, g.y() + (g.height() - h) // 2, w, h)
+
+    def _place_presets_window(self, win):
+        """First time: fill the secondary screen if there is one."""
+        primary = QtGui.QGuiApplication.primaryScreen()
+        others = [s for s in QtGui.QGuiApplication.screens() if s is not primary]
+        if others:
+            win.setGeometry(others[0].availableGeometry())
+        else:
+            win.resize(1000, 900)
 
     def _current_for_preset(self) -> dict:
         return {"freq_hz": int(self.target_hz), "mode": self.mode,
@@ -1066,6 +1092,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Shutdown
     # ======================================================================
     def closeEvent(self, ev):
+        self.opts["main_geometry"] = bytes(self.saveGeometry().toHex()).decode()
         if self.presets_win is not None:
             self.opts["presets_open"] = self.presets_win.isVisible()
             self.opts["presets_geometry"] = bytes(self.presets_win.saveGeometry().toHex()).decode()
