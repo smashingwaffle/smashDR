@@ -31,10 +31,10 @@ import numpy as np
 
 import bandplan
 import settings as cfg
-from dsp import FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
+from dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.1.3"
+VERSION = "0.2.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -120,6 +120,8 @@ import pyqtgraph as pg  # noqa: E402
 
 from widgets import FreqDisplay, LevelMeter  # noqa: E402
 from presets import PresetsWindow  # noqa: E402
+from p25_live import P25Live  # noqa: E402
+import p25 as p25mod  # noqa: E402
 
 try:
     import audio  # noqa: E402
@@ -194,14 +196,18 @@ class SdrReader(QtCore.QThread):
     frame = QtCore.pyqtSignal(object, float, float, object)
     audio = QtCore.pyqtSignal(bytes)
     status = QtCore.pyqtSignal(str)
+    p25_event = QtCore.pyqtSignal(object)
 
     def __init__(self, sdr: RtlSdr, opts: dict):
         super().__init__()
         self.sdr = sdr
+        self.mode = opts["mode"]
+        self.p25 = None
+        self._vocoder_failed = False
         self.target_hz = float(opts["freq_mhz"]) * 1e6
         self.squelch_db = float(opts["squelch_db"])
         self.demod = Demod()
-        self.demod.mode = opts["mode"]
+        self.demod.mode = opts["mode"] if opts["mode"] not in DIGITAL_MODES else "NFM"
         self.demod.set_options(nfm_deemph_us=opts["nfm_deemph_us"],
                                wfm_deemph_us=opts["wfm_deemph_us"],
                                ctcss_filter=opts["ctcss_filter"])
@@ -264,11 +270,14 @@ class SdrReader(QtCore.QThread):
 
         if "rate" in p or "mode" in p:
             if "mode" in p:
-                self.demod.mode = p["mode"]
+                self.mode = p["mode"]
             self._configure_demod()
         elif "center" in p or "target" in p:
-            if self._demod_ok:
-                self.demod.set_offset(self.target_hz - self.sdr.center_freq)
+            off = self.target_hz - self.sdr.center_freq
+            if self.p25 is not None:
+                self.p25.set_offset(off)
+            elif self._demod_ok:
+                self.demod.set_offset(off)
 
         if retune:
             # drop samples captured before the change took effect
@@ -285,13 +294,35 @@ class SdrReader(QtCore.QThread):
             self._open_recording(p["rec_start"])
 
     def _configure_demod(self):
+        rate = float(self.sdr.sample_rate)
+        off = self.target_hz - self.sdr.center_freq
+        if self.mode in DIGITAL_MODES:
+            self._demod_ok = False
+            try:
+                self.p25 = P25Live(rate, off, self._vocoder())
+            except ValueError as e:
+                self.p25 = None
+                self.status.emit(f"P25 off: {e}")
+            return
+        self.p25 = None
         try:
-            self.demod.configure(float(self.sdr.sample_rate),
-                                 self.target_hz - self.sdr.center_freq)
+            self.demod.configure(rate, off, self.mode)
             self._demod_ok = True
         except ValueError as e:
             self._demod_ok = False
             self.status.emit(f"Audio off: {e}")
+
+    def _vocoder(self):
+        """IMBE decoder, or None (calls still shown) if mbe-neo.dll is missing."""
+        if self._vocoder_failed:
+            return None
+        try:
+            import vocoder
+            return vocoder.ImbeDecoder()
+        except OSError as e:
+            self._vocoder_failed = True
+            self.status.emit(f"P25 voice off: {e}. Calls are still shown.")
+            return None
 
     def _open_recording(self, meta: dict):
         rec_dir = Path(meta.pop("dir", None) or (HERE / "recordings"))
@@ -308,7 +339,7 @@ class SdrReader(QtCore.QThread):
             format="cu8 interleaved I/Q",
             center_hz=float(self.sdr.center_freq),
             sample_rate=float(self.sdr.sample_rate),
-            mode=self.demod.mode,
+            mode=self.mode,
             started=stamp,
             tool=f"smashDR {VERSION}",
         )
@@ -326,7 +357,7 @@ class SdrReader(QtCore.QThread):
         self._rec = None
 
     def _channel_above_floor(self, spec, center, rate):
-        half = MODES[self.demod.mode]["half_bw"]
+        half = MODES[self.mode]["half_bw"]
         binw = rate / FFT_SIZE
         c = int(round((self.target_hz - center) / binw + FFT_SIZE / 2))
         h = max(1, int(np.ceil(half / binw)))
@@ -366,7 +397,13 @@ class SdrReader(QtCore.QThread):
 
             snr = self._channel_above_floor(spec, center, rate)
             sq_open = self.squelch_db <= 0 or snr >= self.squelch_db
-            if self._demod_ok:
+            if self.p25 is not None:
+                pcm, events = self.p25.process(iq)
+                if len(pcm):
+                    self.audio.emit(pcm.tobytes())
+                for ev in events:
+                    self.p25_event.emit(ev)
+            elif self._demod_ok:
                 pcm = self.demod.process(iq, sq_open)
                 self.audio.emit(pcm.tobytes())
 
@@ -472,6 +509,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reader.audio.connect(self._on_audio)
         self.reader.frame.connect(self.on_frame)
         self.reader.status.connect(self.status_lbl.setText)
+        self.reader.p25_event.connect(self.on_p25_event)
 
         self.presets_win = None
         self._apply_mode_ui()
@@ -617,6 +655,13 @@ class MainWindow(QtWidgets.QMainWindow):
         lay = QtWidgets.QVBoxLayout()
         lay.addLayout(row1)
         lay.addLayout(row2)
+        self.p25_lbl = QtWidgets.QLabel("")
+        self.p25_lbl.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        f2 = self.p25_lbl.font()
+        f2.setPointSize(f2.pointSize() + 3)
+        self.p25_lbl.setFont(f2)
+        self.p25_lbl.setMinimumHeight(28)
+        lay.addWidget(self.p25_lbl)
         lay.addWidget(split, 1)
         lay.addWidget(self.info)
         lay.addWidget(self.status_lbl)
@@ -874,6 +919,49 @@ class MainWindow(QtWidgets.QMainWindow):
             btn.setChecked(True)
         if hasattr(self, "chan_region"):
             self._update_region()
+        if hasattr(self, "p25_lbl"):
+            self.p25_lbl.setVisible(self.mode in DIGITAL_MODES)
+            if self.mode in DIGITAL_MODES and not self.p25_lbl.text():
+                self.p25_lbl.setText("<span style='color:gray'>P25: waiting for a transmission…</span>")
+
+    # ======================================================================
+    # P25 call readout
+    # ======================================================================
+    def on_p25_event(self, ev: dict):
+        if ev["type"] == "cc":
+            if self.p25_lbl.text().startswith("<span style='color:#43a047'>●"):
+                return                                    # a call is showing; leave it
+            self.p25_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  control channel  ·  "
+                                 f"NAC 0x{ev['nac']:03X}  ·  {ev['tsdu_per_s']:.0f} TSDU/s "
+                                 "<span style='color:gray'>(talkgroup decode comes next)</span>")
+            return
+        tg = ev.get("tgid")
+        src = ev.get("src")
+        parts = []
+        if tg is not None:
+            parts.append(f"TG <b>{tg}</b>")
+        elif ev.get("dst") is not None:
+            parts.append(f"to unit <b>{ev['dst']}</b>")
+        if src is not None:
+            parts.append(f"radio <b>{src}</b>")
+        parts.append(f"NAC 0x{ev['nac']:03X}")
+        if ev.get("emergency"):
+            parts.append("<span style='color:#e53935'><b>EMERGENCY</b></span>")
+        if ev.get("encrypted"):
+            enc = (f"<span style='color:#e53935'>ENCRYPTED ({p25mod.algid_name(ev['algid'])}), "
+                   "not decoded</span>")
+        elif ev.get("encrypted") is False:
+            enc = "<span style='color:#43a047'>clear</span>"
+        else:
+            enc = "<span style='color:gray'>checking…</span>"
+        parts.append(enc)
+        body = "  ·  ".join(parts)
+        if ev["type"] == "end":
+            stamp = time.strftime("%H:%M:%S")
+            self.p25_lbl.setText(f"<span style='color:gray'>last call {stamp} "
+                                 f"({ev['duration']:.1f} s):</span>  {body}")
+        else:
+            self.p25_lbl.setText(f"<span style='color:#43a047'>●</span>  {body}")
 
     def _plot_clicked(self, ev, plot):
         vb = plot.plotItem.vb
@@ -937,11 +1025,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self._set_step(p["step_hz"])
         if p.get("squelch_db") is not None:
             self.sq_slider.setValue(int(p["squelch_db"]))
+        digital = (p.get("digital") or "").upper()
+        if digital.startswith("P25") and self.mode != "P25":
+            self._set_mode("P25")
         self._tune(p["freq_hz"], apply_band_defaults=False)
-        if p.get("digital"):
-            self.status_lbl.setText(
-                f"{p['name']} is {p['digital']}: the decoder isn't built yet, so for now "
-                "you'll see the signal and hear digital noise in NFM.")
+        if digital.startswith("P25"):
+            self.status_lbl.setText(f"{p['name']}  ·  P25" +
+                                    (f"  ·  {p['note']}" if p.get("note") else ""))
+            if "PHASE II" in digital:
+                self.status_lbl.setText(self.status_lbl.text() +
+                                        "  (control channel: frames show, voice is Phase II, not yet)")
+        elif digital:
+            self.status_lbl.setText(f"{p['name']} is {digital}: that decoder isn't built yet, "
+                                    "you'll hear digital noise in NFM.")
         else:
             self.status_lbl.setText(f"{p['name']}" + (f"  ·  {p['note']}" if p.get("note") else ""))
 

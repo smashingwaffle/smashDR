@@ -23,7 +23,10 @@ MODES = {
     "NFM": {"half_bw": 8_000.0, "chan_rate": 48_000},
     "AM": {"half_bw": 5_000.0, "chan_rate": 48_000},
     "WFM": {"half_bw": 100_000.0, "chan_rate": 240_000},
+    # digital: handled by p25_live.P25Live, not by Demod
+    "P25": {"half_bw": 6_250.0, "chan_rate": 48_000},
 }
+DIGITAL_MODES = {"P25"}
 
 
 # --------------------------------------------------------------------------
@@ -127,12 +130,19 @@ class Channelizer:
     def set_offset(self, offset_hz: float):
         self.offset = float(offset_hz)
         self.phase_inc = -2 * np.pi * self.offset / self.rate
+        self._rot = None                    # mixer table, rebuilt lazily
+
+    def _mixer(self, n: int) -> np.ndarray:
+        """exp(j*(phase + inc*k)) for k < n: cached per-sample rotation x one start phasor."""
+        if self._rot is None or len(self._rot) < n:
+            self._rot = np.exp(1j * self.phase_inc * np.arange(max(n, 262144))).astype(np.complex64)
+        start = np.complex64(np.exp(1j * self.phase))
+        self.phase = float((self.phase + self.phase_inc * n) % (2 * np.pi))
+        return self._rot[:n] * start
 
     def process(self, iq: np.ndarray) -> np.ndarray:
         n = len(iq)
-        ph = self.phase + self.phase_inc * np.arange(n)
-        self.phase = float((self.phase + self.phase_inc * n) % (2 * np.pi))
-        x = np.concatenate([self.pending, iq * np.exp(1j * ph).astype(np.complex64)])
+        x = np.concatenate([self.pending, iq * self._mixer(n)])
 
         outs = []
         skip = self.V // self.D
@@ -184,6 +194,8 @@ class Demod:
     def configure(self, rate: float, offset_hz: float, mode: str = None):
         if mode:
             self.mode = mode
+        if self.mode in DIGITAL_MODES:
+            raise ValueError(f"{self.mode} is decoded by its own receiver, not Demod")
         self.rate = float(rate)
         self.offset = float(offset_hz)
         m = MODES[self.mode]

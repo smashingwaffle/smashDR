@@ -21,8 +21,8 @@
 2. C4FM demod + symbol timing  <- done, verified on LAPD Hollenbeck (507.1875)
 3. P25 Phase 1 frame sync + NID (BCH 63,16)  <- done, verified on air
 4. Frame types HDU/LDU/TDU, FEC (Hamming, Golay, RS)  <- done, verified on air; TSBK next
-5. IMBE voice via mbelib-neo (ctypes)  <- done offline (97% frames 0 FEC errors on air);
-   live P25 mode in the receiver next
+5. IMBE voice via mbelib-neo (ctypes)  <- done (97% frames 0 FEC errors on air)
+5b. Live P25 mode in the receiver (P25Live)  <- done, needs on-air confirmation
 6. Trunking: control channel, follow grants
 7. DMR (4FSK, TDMA bursts, AMBE+2)
 8. P25 Phase 2
@@ -46,10 +46,17 @@ UX comes after the decode chain works.
   formula), group_calls(), decode_recording()
 - `p25_fec.py` Hamming(10,6), Golay(24,12)/(18,6), RS over GF(64) (0x43,
   FCR 1) encode + decode. Matches the air: 0 corrections on clean frames.
+- `p25_live.py` P25Live: streaming chain + call state -> 48 kHz audio + events
+  (start/update/end per call, 'cc' once a second on control channels). Voice
+  held until ALGID known; encrypted never decoded. Receiver mode "P25"
+  (dsp.DIGITAL_MODES), P25 presets switch to it.
+- Channelizer mixer uses a cached rotation table (was 70% of CPU)
 - `vocoder.py` mbelib-neo via ctypes (mbe-neo.dll / libmbe-neo.so,
   SMASHDR_MBELIB env override). imbe_fr[8][23], MSB at index 22.
 - `.github/workflows/build-mbelib-neo.yml` builds mbe-neo.dll on a Windows
-  runner from a pinned commit -> release 'mbelib-neo-win64'
+  runner from a pinned commit -> release 'mbelib-neo-win64'.
+  Must stay MBELIB_ENABLE_NATIVE=OFF (native build = illegal instruction on
+  Stefaan's CPU).
 - Encrypted calls (ALGID != 0x80) keep metadata, voice is dropped in
   group_calls(); never pass encrypted IMBE to the vocoder.
 - `tests/` synthetic C4FM generator (standard tx filter) + `python -m tests.test_p25`
