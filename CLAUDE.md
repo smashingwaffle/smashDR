@@ -22,7 +22,7 @@
 3. P25 Phase 1 frame sync + NID (BCH 63,16)  <- done, verified on air
 4. Frame types HDU/LDU/TDU, FEC (Hamming, Golay, RS)  <- done, verified on air; TSBK next
 5. IMBE voice via mbelib-neo (ctypes)  <- done (97% frames 0 FEC errors on air)
-5b. Live P25 mode in the receiver (P25Live)  <- done, needs on-air confirmation
+5b. Live P25 mode in the receiver (P25Live)  <- done, confirmed on air (Hollenbeck, "better than the SDS200")
 6. Trunking: control channel, follow grants
 7. DMR (4FSK, TDMA bursts, AMBE+2)
 8. P25 Phase 2
