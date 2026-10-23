@@ -1,0 +1,64 @@
+# Builds mbe-neo.dll (IMBE/AMBE vocoder, https://github.com/arancormonk/mbelib-neo,
+# GPL-2.0-or-later) for Windows x64 from a pinned commit and publishes it as a
+# release asset, so smashDR can decode P25 voice without a local C toolchain.
+#
+# Download: GitHub repo page -> Releases -> "mbelib-neo for Windows" -> mbe-neo.dll
+# and put it next to main.py (or in lib/).
+
+name: Build mbelib-neo (Windows DLL)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/build-mbelib-neo.yml
+
+permissions:
+  contents: write
+
+env:
+  MBELIB_NEO_COMMIT: a3c7bbdae9eb21cbfab57006c1a5daca7bdcba7f   # tested with smashDR's IMBE path
+  RELEASE_TAG: mbelib-neo-win64
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Fetch mbelib-neo at the pinned commit
+        shell: bash
+        run: |
+          git clone https://github.com/arancormonk/mbelib-neo src
+          cd src && git checkout "$MBELIB_NEO_COMMIT"
+
+      - name: Configure
+        shell: bash
+        run: >
+          cmake -S src -B build -A x64
+          -DMBELIB_BUILD_TESTS=OFF -DMBELIB_BUILD_EXAMPLES=OFF
+          -DMBELIB_WARNINGS_AS_ERRORS=OFF
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --config Release --parallel
+
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir out
+          find build -iname "mbe-neo.dll" -exec cp {} out/ \;
+          ls -l out
+          test -f out/mbe-neo.dll
+          cp src/LICENSE out/mbelib-neo-LICENSE.txt
+          echo "mbelib-neo commit $MBELIB_NEO_COMMIT, built by smashDR CI" > out/mbelib-neo-SOURCE.txt
+          echo "Source: https://github.com/arancormonk/mbelib-neo/tree/$MBELIB_NEO_COMMIT" >> out/mbelib-neo-SOURCE.txt
+          sha256sum out/* > out/SHA256SUMS.txt
+
+      - name: Publish release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "$RELEASE_TAG" --yes --cleanup-tag -R "$GITHUB_REPOSITORY" || true
+          gh release create "$RELEASE_TAG" out/* -R "$GITHUB_REPOSITORY" \
+            --title "mbelib-neo for Windows" \
+            --notes "mbe-neo.dll (x64) built from arancormonk/mbelib-neo@$MBELIB_NEO_COMMIT. Put mbe-neo.dll next to main.py. GPL-2.0-or-later; source link in mbelib-neo-SOURCE.txt."

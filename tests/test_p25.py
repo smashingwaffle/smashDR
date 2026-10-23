@@ -56,6 +56,33 @@ def test_chain():
               f"CPU {dt / secs * 100:.0f}% of real time")
 
 
+def test_calls():
+    """Two transmissions with silence around them: a clear call and an AES call."""
+    from tests import p25_synth as sy
+    rng = np.random.default_rng(7)
+    iq = np.concatenate([
+        sy.modulate(sy.build_call(0x466, 1001, 1234567, 0x80, 3, rng), seed=1),
+        sy.modulate(sy.build_call(0x466, 2002, 7654321, 0x84, 2, rng, kid=0x1234), seed=2),
+    ])
+    rx = p25.P25Phase1Receiver(960_000, -192_000)
+    for i in range(0, len(iq), 262144):
+        rx.process(iq[i:i + 262144])
+    frames = rx.framer.frames
+    calls = p25.group_calls(frames)
+    hdus = [f for f in frames if f["duid"] == 0]
+    print(f"calls: {len(calls)} (want 2), HDUs decoded {sum(f.get('rs_errors', -1) == 0 for f in hdus)}/2")
+    for c in calls:
+        print(f"  tg {c['tgid']} src {c['src']} {p25.algid_name(c['algid'])} "
+              f"encrypted={c['encrypted']} voice frames {len(c['imbe'])} hdu={c['hdu']}")
+    ok = (len(calls) == 2 and calls[0]["tgid"] == 1001 and calls[0]["src"] == 1234567
+          and not calls[0]["encrypted"] and len(calls[0]["imbe"]) == 54
+          and calls[1]["tgid"] == 2002 and calls[1]["encrypted"] and calls[1]["algid"] == 0x84
+          and calls[1]["imbe"] == [] and all(c["hdu"] for c in calls))
+    print("call round-trip:", "PASS" if ok else "FAIL")
+    assert ok
+
+
 if __name__ == "__main__":
     test_bch()
     test_chain()
+    test_calls()

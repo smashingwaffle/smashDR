@@ -18,10 +18,11 @@
 ## Build order
 1. Receiver: spectrum/waterfall, IQ recording, NFM/AM/WFM, VFO, band plan, settings  <- done
 1b. Scanner: memories, scan lists, band/range scan  <- next
-2. C4FM demod + symbol timing, run on recordings  <- done (synthetic), needs real recording
-3. P25 Phase 1 frame sync + NID (BCH 63,16)  <- done (synthetic)
-4. Frame types (HDU/LDU/TSBK), FEC
-5. IMBE voice via mbelib (ctypes DLL)
+2. C4FM demod + symbol timing  <- done, verified on LAPD Hollenbeck (507.1875)
+3. P25 Phase 1 frame sync + NID (BCH 63,16)  <- done, verified on air
+4. Frame types HDU/LDU/TDU, FEC (Hamming, Golay, RS)  <- done, verified on air; TSBK next
+5. IMBE voice via mbelib-neo (ctypes)  <- done offline (97% frames 0 FEC errors on air);
+   live P25 mode in the receiver next
 6. Trunking: control channel, follow grants
 7. DMR (4FSK, TDMA bursts, AMBE+2)
 8. P25 Phase 2
@@ -38,8 +39,19 @@ UX comes after the decode chain works.
   presets_default.json in git) + PresetsWindow (second-screen button grid)
 - Stefaan is in LA (90032); presets and examples should be LA-area, Mt Wilson
   is his main repeater site. Never seed other regions' frequencies.
-- `p25.py` P25 Phase 1: C4FMDemod (integrate-and-dump + Gardner, loop gain
-  negative), P25Framer (sync + NID, ML BCH decode), decode_recording()
+- `p25.py` P25 Phase 1: C4FMDemod (raw symbols; integrate-and-dump + Gardner,
+  loop gain negative), P25Framer (normalised-correlation sync, per-frame
+  gain/offset LS fit from the sync -> catches HDUs; NID ML BCH; collects
+  whole frames), decode_frame_body (LC, ESS/ALGID, HDU, IMBE de-interleave
+  formula), group_calls(), decode_recording()
+- `p25_fec.py` Hamming(10,6), Golay(24,12)/(18,6), RS over GF(64) (0x43,
+  FCR 1) encode + decode. Matches the air: 0 corrections on clean frames.
+- `vocoder.py` mbelib-neo via ctypes (mbe-neo.dll / libmbe-neo.so,
+  SMASHDR_MBELIB env override). imbe_fr[8][23], MSB at index 22.
+- `.github/workflows/build-mbelib-neo.yml` builds mbe-neo.dll on a Windows
+  runner from a pinned commit -> release 'mbelib-neo-win64'
+- Encrypted calls (ALGID != 0x80) keep metadata, voice is dropped in
+  group_calls(); never pass encrypted IMBE to the vocoder.
 - `tests/` synthetic C4FM generator (standard tx filter) + `python -m tests.test_p25`
 - `tools/p25_file.py` frame report for a .cu8 recording
 - `audio.py` QtMultimedia output, converts to device's preferred format

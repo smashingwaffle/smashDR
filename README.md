@@ -53,14 +53,19 @@ Your presets live in `presets.json` (not in git); new defaults added to
 
 ## P25 (in progress)
 
-Phase 1 demodulation and frame sync work on synthetic signals. To check a
-real P25 channel, record it (Record IQ, 0.96 MS/s) and run:
+Phase 1 decoding works offline on recordings: frames, talkgroup, radio ID,
+clear/encrypted, and clear voice through mbelib-neo.
+
+1. Get `mbe-neo.dll`: GitHub repo -> Releases -> "mbelib-neo for Windows"
+   (built by this repo's workflow). Put it next to `main.py`.
+2. Record a P25 channel (Record IQ, 0.96 MS/s), then:
 
 ```
-python -m tools.p25_file recordings\<file>.cu8
+python -m tools.p25_file recordings\<file>.cu8 --wav calls.wav
 ```
 
-It lists the frames found with NAC, frame type and error counts.
+It lists each transmission (talkgroup, radio ID, encryption) and writes the
+clear calls' audio to the WAV. Encrypted calls are listed but never decoded.
 
 ## Scope
 
