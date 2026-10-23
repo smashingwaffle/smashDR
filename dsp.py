@@ -42,8 +42,20 @@ def lowpass_taps(num: int, cutoff: float) -> np.ndarray:
     return (h / h.sum()).astype(np.float32)
 
 
+def deemphasis_taps(tau_s: float, fs: float, num: int = 256, ref_hz: float = 1000.0) -> np.ndarray:
+    """
+    FM de-emphasis (one-pole lowpass, corner 1/(2*pi*tau)) as a truncated FIR,
+    normalised to unity gain at ref_hz so levels stay comparable.
+    """
+    a = 1.0 - np.exp(-1.0 / (fs * tau_s))
+    h = a * (1.0 - a) ** np.arange(num)
+    w = 2 * np.pi * ref_hz / fs
+    g = abs(np.sum(h * np.exp(-1j * w * np.arange(num))))
+    return (h / g).astype(np.float32)
+
+
 class StreamFir:
-    """FIR filter that keeps its history between blocks (symmetric taps)."""
+    """FIR filter that keeps its history between blocks (any taps, causal)."""
 
     def __init__(self, taps: np.ndarray, dtype):
         self.taps = taps
@@ -67,9 +79,12 @@ class NfmMonitor:
       -> boxcar decimate to 240 kHz (nulls land on the alias bands)
       -> 201-tap channel filter, decimate by 5 -> 48 kHz
       -> FM discriminator
-      -> 250-3400 Hz audio bandpass (kills DC and hiss)
+      -> 300-3400 Hz audio bandpass (kills DC, CTCSS tones, hiss)
+      -> 750 us de-emphasis (standard land-mobile NFM)
       -> int16 PCM, 48 kHz mono
     """
+
+    DEEMPH_TAU = 750e-6
 
     DEV_SCALE = 0.8 / (2 * np.pi * 3000 / AUDIO_RATE)   # 3 kHz deviation -> 0.8 FS
 
@@ -87,8 +102,9 @@ class NfmMonitor:
         self.chan = StreamFir(lowpass_taps(201, 7000 / IF_RATE), np.complex64)
         self.k2 = 0
         self.last = np.complex64(1)
-        bp = lowpass_taps(127, 3400 / AUDIO_RATE) - lowpass_taps(127, 250 / AUDIO_RATE)
+        bp = lowpass_taps(1023, 3400 / AUDIO_RATE) - lowpass_taps(1023, 300 / AUDIO_RATE)
         self.audio_fir = StreamFir(bp.astype(np.float32), np.float32)
+        self.deemph = StreamFir(deemphasis_taps(self.DEEMPH_TAU, AUDIO_RATE), np.float32)
         self.phase = 0.0
         self.set_offset(offset_hz)
 
@@ -116,7 +132,7 @@ class NfmMonitor:
         z = np.concatenate([[self.last], out])
         self.last = out[-1]
         d = np.angle(z[1:] * np.conj(z[:-1])).astype(np.float32) * np.float32(self.DEV_SCALE)
-        a = self.audio_fir(d)
+        a = self.deemph(self.audio_fir(d))
         if not open_:
             a = np.zeros_like(a)
         return (np.clip(a, -1.0, 1.0) * 32767).astype(np.int16)

@@ -6,10 +6,11 @@ directly, we convert to its preferred format (channels, sample format, rate).
 """
 
 import numpy as np
-from PyQt6.QtMultimedia import QAudioDevice, QAudioFormat, QAudioSink, QMediaDevices
+from PyQt6.QtMultimedia import QAudio, QAudioDevice, QAudioFormat, QAudioSink, QMediaDevices
 
 SRC_RATE = 48_000
-BUFFER_SEC = 0.5
+BUFFER_SEC = 0.6       # sink buffer
+PREBUFFER_SEC = 0.25   # collect this much before (re)starting playback
 
 
 def output_devices() -> list:
@@ -31,6 +32,10 @@ class AudioOut:
         self.device = None
         self.volume = 0.5
         self.fmt = None
+        self._pend = bytearray()
+        self._priming = True
+        self._prebytes = 0
+        self.underruns = 0
 
     # ---- lifecycle ----
     def open(self, device: QAudioDevice) -> str:
@@ -48,6 +53,10 @@ class AudioOut:
         self.sink.setBufferSize(int(fmt.bytesForDuration(int(BUFFER_SEC * 1e6))))
         self.sink.setVolume(self.volume)
         self.io = self.sink.start()
+        frame = fmt.bytesPerFrame()
+        self._prebytes = int(fmt.bytesForDuration(int(PREBUFFER_SEC * 1e6))) // frame * frame
+        self._pend = bytearray()
+        self._priming = True
         note = "" if fmt is want else (
             f" (converting to {fmt.sampleRate()} Hz, {fmt.channelCount()} ch, "
             f"{fmt.sampleFormat().name})")
@@ -69,6 +78,21 @@ class AudioOut:
         if not self.io or not pcm16:
             return
         data = self._convert(np.frombuffer(pcm16, dtype=np.int16))
+
+        # Jitter buffer: SDR audio arrives in ~110 ms bursts. If the sink ran
+        # dry, collect PREBUFFER_SEC before feeding it again so it doesn't
+        # stutter on every burst.
+        if not self._priming and self.sink.state() == QAudio.State.IdleState:
+            self._priming = True
+            self.underruns += 1
+        if self._priming:
+            self._pend += data
+            if len(self._pend) < self._prebytes:
+                return
+            data = bytes(self._pend)
+            self._pend = bytearray()
+            self._priming = False
+
         free = self.sink.bytesFree()
         frame = self.fmt.bytesPerFrame()
         free -= free % frame

@@ -37,7 +37,7 @@ import settings as cfg
 from dsp import FFT_SIZE, NfmMonitor, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.0.2"
+VERSION = "0.0.3"
 
 READ_BYTES = 524288          # 262144 IQ samples per read (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
