@@ -1,6 +1,8 @@
 # Builds mbe-neo.dll (IMBE/AMBE vocoder, https://github.com/arancormonk/mbelib-neo,
 # GPL-2.0-or-later) for Windows x64 from a pinned commit and publishes it as a
 # release asset, so smashDR can decode P25 voice without a local C toolchain.
+# MBELIB_ENABLE_NATIVE=OFF: portable build (native tuning targets the CI CPU and
+# crashed with an illegal instruction on a desktop CPU).
 #
 # Download: GitHub repo page -> Releases -> "mbelib-neo for Windows" -> mbe-neo.dll
 # and put it next to main.py (or in lib/).
@@ -35,7 +37,7 @@ jobs:
         run: >
           cmake -S src -B build -A x64
           -DMBELIB_BUILD_TESTS=OFF -DMBELIB_BUILD_EXAMPLES=OFF
-          -DMBELIB_WARNINGS_AS_ERRORS=OFF
+          -DMBELIB_WARNINGS_AS_ERRORS=OFF -DMBELIB_ENABLE_NATIVE=OFF
 
       - name: Build
         shell: bash
