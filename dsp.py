@@ -81,12 +81,17 @@ class NfmMonitor:
       -> FM discriminator
       -> 300-3400 Hz audio bandpass (kills DC, CTCSS tones, hiss)
       -> 750 us de-emphasis (standard land-mobile NFM)
+      -> gate (warm-up mute, squelch) with short ramps, soft limiter
       -> int16 PCM, 48 kHz mono
     """
 
     DEEMPH_TAU = 750e-6
-
-    DEV_SCALE = 0.8 / (2 * np.pi * 3000 / AUDIO_RATE)   # 3 kHz deviation -> 0.8 FS
+    # 3 kHz deviation at 1 kHz -> 0.3 FS. De-emphasis lifts the lows ~+9 dB at
+    # 300 Hz, so this leaves headroom for bassy voices before the limiter.
+    DEV_SCALE = 0.3 / (2 * np.pi * 3000 / AUDIO_RATE)
+    WARMUP_SEC = 0.06      # mute while filters fill after (re)configure
+    RAMP_SEC = 0.01        # fade in/out on warm-up end and squelch changes
+    LIMIT_KNEE = 0.7
 
     def __init__(self):
         self.rate = None
@@ -101,12 +106,18 @@ class NfmMonitor:
         self.rem1 = np.zeros(0, dtype=np.complex64)
         self.chan = StreamFir(lowpass_taps(201, 7000 / IF_RATE), np.complex64)
         self.k2 = 0
-        self.last = np.complex64(1)
+        self.last = None
+        self.warm_left = int(self.WARMUP_SEC * AUDIO_RATE)
+        self.gate = 0.0            # current output gain 0..1
         bp = lowpass_taps(1023, 3400 / AUDIO_RATE) - lowpass_taps(1023, 300 / AUDIO_RATE)
         self.audio_fir = StreamFir(bp.astype(np.float32), np.float32)
         self.deemph = StreamFir(deemphasis_taps(self.DEEMPH_TAU, AUDIO_RATE), np.float32)
         self.phase = 0.0
         self.set_offset(offset_hz)
+
+    def mute_for(self, sec: float):
+        """Silence output for a while (e.g. after a retune), then fade back in."""
+        self.warm_left = max(self.warm_left, int(sec * AUDIO_RATE))
 
     def set_offset(self, offset_hz: float):
         self.offset = offset_hz
@@ -129,10 +140,39 @@ class NfmMonitor:
         if len(out) == 0:
             return np.zeros(0, dtype=np.int16)
 
+        if self.last is None:
+            self.last = out[0]       # no phase step on the very first sample
         z = np.concatenate([[self.last], out])
         self.last = out[-1]
         d = np.angle(z[1:] * np.conj(z[:-1])).astype(np.float32) * np.float32(self.DEV_SCALE)
         a = self.deemph(self.audio_fir(d))
-        if not open_:
-            a = np.zeros_like(a)
-        return (np.clip(a, -1.0, 1.0) * 32767).astype(np.int16)
+        a *= self._gate_curve(len(a), open_)
+        return (self._soft_limit(a) * 32767).astype(np.int16)
+
+    def _gate_curve(self, n: int, open_: bool) -> np.ndarray:
+        """Per-sample gain: muted during warm-up, ramped on squelch changes."""
+        g = np.empty(n, dtype=np.float32)
+        mute = min(n, self.warm_left)
+        g[:mute] = 0.0
+        self.warm_left -= mute
+        if mute:
+            self.gate = 0.0
+        rest = n - mute
+        if rest:
+            target = 1.0 if open_ else 0.0
+            step = 1.0 / (self.RAMP_SEC * AUDIO_RATE)
+            k = np.arange(1, rest + 1, dtype=np.float32) * step
+            g[mute:] = (np.minimum(self.gate + k, target) if target > self.gate
+                        else np.maximum(self.gate - k, target))
+            self.gate = float(g[-1])
+        return g
+
+    def _soft_limit(self, a: np.ndarray) -> np.ndarray:
+        """Linear below the knee, smooth tanh approach to full scale above it."""
+        k = self.LIMIT_KNEE
+        mag = np.abs(a)
+        over = mag > k
+        if over.any():
+            a = a.copy()
+            a[over] = np.sign(a[over]) * (k + (1 - k) * np.tanh((mag[over] - k) / (1 - k)))
+        return a

@@ -25,6 +25,7 @@ Run
 import argparse
 import json
 import os
+import queue
 import sys
 import threading
 import time
@@ -37,7 +38,7 @@ import settings as cfg
 from dsp import FFT_SIZE, NfmMonitor, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.0.3"
+VERSION = "0.0.4"
 
 READ_BYTES = 524288          # 262144 IQ samples per read (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -128,7 +129,48 @@ pg.setConfigOptions(imageAxisOrder="row-major", antialias=False)
 
 
 # --------------------------------------------------------------------------
-# SDR reader thread
+# USB capture (async, gap-free)
+# --------------------------------------------------------------------------
+class AsyncCapture(threading.Thread):
+    """
+    Streams from librtlsdr with rtlsdr_read_async and does nothing but copy
+    each USB block into a queue. Blocking read_bytes() in the processing loop
+    lost samples between calls (clicks every few blocks); this doesn't.
+    """
+
+    def __init__(self, sdr, nbytes: int, q: queue.Queue):
+        super().__init__(name="rtlsdr-capture", daemon=True)
+        self.sdr = sdr
+        self.nbytes = nbytes
+        self.q = q
+        self.dropped = 0      # blocks we had to throw away because processing fell behind
+        self.error = None
+
+    def _cb(self, buf, _ctx):
+        try:
+            data = np.frombuffer(buf, dtype=np.uint8).tobytes()
+        except TypeError:
+            data = bytes(bytearray(buf))
+        try:
+            self.q.put_nowait(data)
+        except queue.Full:
+            self.dropped += 1
+
+    def run(self):
+        try:
+            self.sdr.read_bytes_async(self._cb, self.nbytes)
+        except Exception as e:
+            self.error = e
+
+    def stop(self):
+        try:
+            self.sdr.cancel_read_async()
+        except Exception:
+            pass
+
+
+# --------------------------------------------------------------------------
+# SDR processing thread
 # --------------------------------------------------------------------------
 class SdrReader(QtCore.QThread):
     # spectrum_db, center_hz, rate_hz, stats dict
@@ -150,6 +192,8 @@ class SdrReader(QtCore.QThread):
         self._rec = None
         self._rec_bytes = 0
         self._rec_path = None
+        self._q = queue.Queue(maxsize=40)   # ~4 s of headroom at 2.4 MS/s
+        self._cap = None
 
     def request(self, **kw):
         with self._lock:
@@ -196,7 +240,15 @@ class SdrReader(QtCore.QThread):
                 self.monitor.set_offset(self.target_hz - self.sdr.center_freq)
 
         if retune:
-            self._flush = 2  # drop stale buffered samples
+            # drop samples captured before the change took effect
+            while True:
+                try:
+                    self._q.get_nowait()
+                except queue.Empty:
+                    break
+            self._flush = 2
+            if self._mon_ok:
+                self.monitor.mute_for(0.1)
 
         if "rec_start" in p:
             self._open_recording(p["rec_start"])
@@ -248,13 +300,16 @@ class SdrReader(QtCore.QThread):
 
     def run(self):
         self._configure_monitor()
+        self._cap = AsyncCapture(self.sdr, READ_BYTES, self._q)
+        self._cap.start()
         while self._running:
             self._apply_pending()
             try:
-                raw = self.sdr.read_bytes(READ_BYTES)
-            except Exception as e:
-                self.status.emit(f"Read error: {e}")
-                time.sleep(0.5)
+                raw = self._q.get(timeout=0.5)
+            except queue.Empty:
+                if self._cap.error:
+                    self.status.emit(f"Capture stopped: {self._cap.error}")
+                    time.sleep(0.5)
                 continue
 
             if self._flush:
@@ -280,9 +335,12 @@ class SdrReader(QtCore.QThread):
                 self.audio.emit(pcm.tobytes())
 
             stats = {"clip": clip, "rms": rms_db, "sq_open": sq_open,
+                     "drops": self._cap.dropped,
                      "rec_mb": self._rec_bytes / 1e6 if self._rec else None}
             self.frame.emit(spec, center, rate, stats)
 
+        self._cap.stop()
+        self._cap.join(timeout=2.0)
         self._close_recording()
 
 
@@ -602,6 +660,8 @@ class ProbeWindow(QtWidgets.QMainWindow):
         if stats["clip"] > 0.1:
             clip_txt += "  << OVERLOAD, lower gain"
         rec_txt = f"   REC {stats['rec_mb']:.0f} MB" if stats["rec_mb"] is not None else ""
+        if stats["drops"]:
+            rec_txt += f"   DROPPED {stats['drops']} blocks"
         self.info.setText(f"{self.target_hz / 1e6:.5f} MHz   {sq_txt}  {chan_txt}   "
                           f"floor {floor:6.1f}   {clip_txt}{rec_txt}")
 
