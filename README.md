@@ -47,9 +47,20 @@ sidecar; those captures are what the decoder stages are developed against.
 time it fills your secondary monitor, after that it remembers where you put it).
 Groups collapse; click a preset to tune, right-click to edit. **Import…**
 takes rows copied from a RadioReference table: select the rows (with or
-without the header), copy, paste. Digital channels are skipped for now.
+without the header), copy, paste. Clear digital channels are kept and labelled; encrypted ones are skipped.
 Your presets live in `presets.json` (not in git); new defaults added to
 `presets_default.json` merge in without undoing your deletions.
+
+## P25 (in progress)
+
+Phase 1 demodulation and frame sync work on synthetic signals. To check a
+real P25 channel, record it (Record IQ, 0.96 MS/s) and run:
+
+```
+python -m tools.p25_file recordings\<file>.cu8
+```
+
+It lists the frames found with NAC, frame type and error counts.
 
 ## Scope
 

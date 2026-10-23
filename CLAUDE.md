@@ -18,8 +18,8 @@
 ## Build order
 1. Receiver: spectrum/waterfall, IQ recording, NFM/AM/WFM, VFO, band plan, settings  <- done
 1b. Scanner: memories, scan lists, band/range scan  <- next
-2. C4FM demod + symbol timing, run on recordings
-3. P25 Phase 1 frame sync + NID (BCH 63,16)
+2. C4FM demod + symbol timing, run on recordings  <- done (synthetic), needs real recording
+3. P25 Phase 1 frame sync + NID (BCH 63,16)  <- done (synthetic)
 4. Frame types (HDU/LDU/TSBK), FEC
 5. IMBE voice via mbelib (ctypes DLL)
 6. Trunking: control channel, follow grants
@@ -38,6 +38,10 @@ UX comes after the decode chain works.
   presets_default.json in git) + PresetsWindow (second-screen button grid)
 - Stefaan is in LA (90032); presets and examples should be LA-area, Mt Wilson
   is his main repeater site. Never seed other regions' frequencies.
+- `p25.py` P25 Phase 1: C4FMDemod (integrate-and-dump + Gardner, loop gain
+  negative), P25Framer (sync + NID, ML BCH decode), decode_recording()
+- `tests/` synthetic C4FM generator (standard tx filter) + `python -m tests.test_p25`
+- `tools/p25_file.py` frame report for a .cu8 recording
 - `audio.py` QtMultimedia output, converts to device's preferred format
 - `settings.py` settings.json store (not in git)
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
