@@ -1,0 +1,4 @@
+numpy
+pyrtlsdr
+pyqtgraph
+PyQt6

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build
+build/
+dist/
+*.spec
+
+# Native libraries (dropped in locally from the rtl-sdr-blog release)
+*.dll
+lib/
+
+# IQ recordings - large, keep local
+recordings/
+*.cu8
+*.cf32
+
+# OS / editor
+.DS_Store
+Thumbs.db
