@@ -221,7 +221,6 @@ class SdrReader(QtCore.QThread):
             format="cu8 interleaved I/Q",
             center_hz=float(self.sdr.center_freq),
             sample_rate=float(self.sdr.sample_rate),
-            gain=str(self.sdr.gain),
             started=stamp,
             tool=f"smashDR sdr_probe {VERSION}",
         )
@@ -561,6 +560,7 @@ class ProbeWindow(QtWidgets.QMainWindow):
     def toggle_record(self, on):
         if on:
             self.reader.request(rec_start={"target_hz": self.target_hz,
+                                           "gain": self.gain_box.currentText(),
                                            "ppm": self.ppm_spin.value()})
             self.rec_btn.setText("Stop rec")
         else:
