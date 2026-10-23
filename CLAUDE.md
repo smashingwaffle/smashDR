@@ -30,5 +30,5 @@ rate, gain, target frequency. Decoder stages should run on a file first,
 live SDR second.
 
 ## Native libs (not in git)
-rtlsdr.dll + libusb-1.0.dll from the rtl-sdr-blog release (x64), next to
+rtlsdr.dll + msvcr100.dll + pthreadVC2.dll from the rtl-sdr-blog release (x64; libusb is built in), next to
 the scripts or in `lib/`. The V4 needs the rtl-sdr-blog fork of librtlsdr.

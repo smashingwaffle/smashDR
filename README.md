@@ -14,7 +14,7 @@ pip install -r requirements.txt
 ```
 
 1. Download the latest release from the rtl-sdr-blog GitHub repo and copy
-   `rtlsdr.dll` and `libusb-1.0.dll` from its **x64** folder into this folder
+   `rtlsdr.dll`, `msvcr100.dll` and `pthreadVC2.dll` from its **x64** folder into this folder
    (or a `lib` subfolder).
 2. One-time driver: run Zadig -> Options -> List All Devices ->
    *Bulk-In, Interface (Interface 0)* -> install **WinUSB**.

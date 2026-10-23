@@ -17,7 +17,7 @@ never sits on the dongle's DC spike.
 
 Setup (Windows)
   pip install pyrtlsdr numpy pyqtgraph PyQt6
-  Put rtlsdr.dll + libusb-1.0.dll (x64 folder of the rtl-sdr-blog release)
+  Put rtlsdr.dll, msvcr100.dll, pthreadVC2.dll (x64 folder of the rtl-sdr-blog release)
   next to this script, or in a "lib" folder next to it.
   The V4 needs the WinUSB driver (Zadig) - one-time step.
 
@@ -67,7 +67,7 @@ try:
     from rtlsdr import RtlSdr
 except Exception as e:  # missing DLL shows up as ImportError/OSError
     print("\n[!] Could not load librtlsdr:", e)
-    print("    Put rtlsdr.dll and libusb-1.0.dll (x64, from the rtl-sdr-blog")
+    print("    Put rtlsdr.dll, msvcr100.dll and pthreadVC2.dll (x64, from the rtl-sdr-blog")
     print("    GitHub release) next to this script or in a 'lib' folder.\n")
     sys.exit(1)
 
