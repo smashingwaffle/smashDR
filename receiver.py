@@ -1,0 +1,1140 @@
+"""
+receiver.py  -  smashDR receiver window.
+
+Receiver tab
+  * VFO frequency display (wheel per digit, arrows = step, double-click to type)
+  * NFM / AM / WFM, tuning step, band-plan label ("where am I")
+  * Band-plan strip, spectrum and waterfall: click = tune (snapped to step),
+    wheel = step up/down, drag the yellow marker
+  * Signal meter with squelch marker, volume, mute, IQ recording
+Settings tab
+  * Radio: device, sample rate, gain, PPM, bias tee, band-plan auto mode/step
+  * Audio: output device, test tone, de-emphasis, CTCSS filter
+  * Display: waterfall range, palette, averaging
+  * Recording: folder
+
+The hardware is tuned slightly ABOVE the target so the target never sits on
+the dongle's DC spike; it re-centres automatically when you tune off-span.
+"""
+
+import argparse
+import json
+import os
+import queue
+import sys
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+
+import bandplan
+import settings as cfg
+from dsp import FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
+
+HERE = Path(__file__).resolve().parent
+VERSION = "0.1.0"
+
+READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
+WF_ROWS = 300
+RATES_MSPS = [2.4, 1.92, 1.2, 0.96]
+STEPS_HZ = [1000, 2500, 5000, 6250, 7500, 8330, 10000, 12500, 15000, 20000,
+            25000, 50000, 100000, 200000]
+PALETTES = ["inferno", "viridis", "plasma", "magma"]
+AVERAGING = {"Off": 1.0, "Low": 0.6, "Medium": 0.35, "High": 0.15}
+
+
+# --------------------------------------------------------------------------
+# Library loading
+# --------------------------------------------------------------------------
+def _setup_dll_path():
+    for d in (HERE, HERE / "lib"):
+        if d.is_dir():
+            os.environ["PATH"] = str(d) + os.pathsep + os.environ.get("PATH", "")
+            if hasattr(os, "add_dll_directory"):
+                try:
+                    os.add_dll_directory(str(d))
+                except OSError:
+                    pass
+
+
+def _pe_arch(path: Path) -> str:
+    """Read the machine type from a DLL's PE header."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0x3C)
+            pe_off = int.from_bytes(f.read(4), "little")
+            f.seek(pe_off + 4)
+            machine = int.from_bytes(f.read(2), "little")
+        return {0x8664: "x64", 0x14C: "x86 (32-bit)", 0xAA64: "ARM64"}.get(machine, hex(machine))
+    except OSError:
+        return "unreadable"
+
+
+def _diagnose_rtlsdr_dll():
+    """Explain exactly why rtlsdr.dll won't load. Returns None if it loads."""
+    import ctypes
+    import platform
+
+    dll = next((d / "rtlsdr.dll" for d in (HERE, HERE / "lib")
+                if (d / "rtlsdr.dll").exists()), None)
+    if dll is None:
+        return (f"rtlsdr.dll is not in {HERE} or {HERE / 'lib'}.\n"
+                "    Copy rtlsdr.dll, msvcr100.dll and pthreadVC2.dll there.")
+
+    arch = _pe_arch(dll)
+    py_arch = "x64" if platform.architecture()[0] == "64bit" else "x86 (32-bit)"
+    if arch != py_arch:
+        return (f"{dll} is an {arch} DLL but Python is {py_arch}.\n"
+                "    Use the files from the x64 folder of the rtl-sdr-blog Release.zip.")
+
+    missing = [n for n in ("msvcr100.dll", "pthreadVC2.dll")
+               if not (dll.parent / n).exists()]
+    try:
+        ctypes.CDLL(str(dll))
+    except OSError as e:
+        msg = f"{dll} found ({arch}) but Windows refused to load it: {e}"
+        if missing:
+            msg += f"\n    Missing next to it: {', '.join(missing)}"
+        return msg
+    return None
+
+
+_setup_dll_path()
+
+try:
+    from rtlsdr import RtlSdr
+except Exception as e:  # missing DLL shows up as ImportError/OSError
+    print("\n[!] Could not load librtlsdr:", e)
+    reason = _diagnose_rtlsdr_dll() if sys.platform == "win32" else None
+    if reason:
+        print("    " + reason + "\n")
+    else:
+        print("    rtlsdr.dll itself loads fine, so pyrtlsdr can't find it.")
+        print(f"    Folder searched: {HERE}\n")
+    sys.exit(1)
+
+from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: E402
+import pyqtgraph as pg  # noqa: E402
+
+from widgets import FreqDisplay, LevelMeter  # noqa: E402
+
+try:
+    import audio  # noqa: E402
+except Exception as e:  # QtMultimedia missing
+    print("[!] Audio disabled, QtMultimedia not available:", e)
+    audio = None
+
+pg.setConfigOptions(imageAxisOrder="row-major", antialias=False)
+
+
+def list_devices() -> list:
+    """Names of attached RTL-SDR devices (best effort)."""
+    try:
+        import ctypes
+        from rtlsdr import librtlsdr as _l
+        lib = _l.librtlsdr
+        count = lib.rtlsdr_get_device_count()
+        fn = lib.rtlsdr_get_device_name
+        fn.restype = ctypes.c_char_p
+        fn.argtypes = [ctypes.c_uint32]
+        return [f"#{i}: {fn(i).decode(errors='replace')}" for i in range(count)]
+    except Exception:
+        return []
+
+
+# --------------------------------------------------------------------------
+# USB capture (async, gap-free)
+# --------------------------------------------------------------------------
+class AsyncCapture(threading.Thread):
+    """
+    Streams from librtlsdr with rtlsdr_read_async and does nothing but copy
+    each USB block into a queue. Blocking read_bytes() in the processing loop
+    lost samples between calls (clicks every few blocks); this doesn't.
+    """
+
+    def __init__(self, sdr, nbytes: int, q: queue.Queue):
+        super().__init__(name="rtlsdr-capture", daemon=True)
+        self.sdr = sdr
+        self.nbytes = nbytes
+        self.q = q
+        self.dropped = 0      # blocks thrown away because processing fell behind
+        self.error = None
+
+    def _cb(self, buf, _ctx):
+        try:
+            data = np.frombuffer(buf, dtype=np.uint8).tobytes()
+        except TypeError:
+            data = bytes(bytearray(buf))
+        try:
+            self.q.put_nowait(data)
+        except queue.Full:
+            self.dropped += 1
+
+    def run(self):
+        try:
+            self.sdr.read_bytes_async(self._cb, self.nbytes)
+        except Exception as e:
+            self.error = e
+
+    def stop(self):
+        try:
+            self.sdr.cancel_read_async()
+        except Exception:
+            pass
+
+
+# --------------------------------------------------------------------------
+# SDR processing thread
+# --------------------------------------------------------------------------
+class SdrReader(QtCore.QThread):
+    # spectrum_db, center_hz, rate_hz, stats dict
+    frame = QtCore.pyqtSignal(object, float, float, object)
+    audio = QtCore.pyqtSignal(bytes)
+    status = QtCore.pyqtSignal(str)
+
+    def __init__(self, sdr: RtlSdr, opts: dict):
+        super().__init__()
+        self.sdr = sdr
+        self.target_hz = float(opts["freq_mhz"]) * 1e6
+        self.squelch_db = float(opts["squelch_db"])
+        self.demod = Demod()
+        self.demod.mode = opts["mode"]
+        self.demod.set_options(nfm_deemph_us=opts["nfm_deemph_us"],
+                               wfm_deemph_us=opts["wfm_deemph_us"],
+                               ctcss_filter=opts["ctcss_filter"])
+        self._demod_ok = False
+        self._running = True
+        self._lock = threading.Lock()
+        self._pending = {}
+        self._flush = 0
+        self._rec = None
+        self._rec_bytes = 0
+        self._rec_path = None
+        self._q = queue.Queue(maxsize=40)   # ~4 s of headroom at 2.4 MS/s
+        self._cap = None
+
+    def request(self, **kw):
+        with self._lock:
+            self._pending.update(kw)
+
+    def stop(self):
+        self._running = False
+
+    # -- applied inside this thread so librtlsdr is only touched here -------
+    def _apply_pending(self):
+        with self._lock:
+            p, self._pending = self._pending, {}
+        if not p:
+            return
+
+        retune = any(k in p for k in ("center", "rate", "gain", "ppm"))
+        if self._rec and ("rec_stop" in p or retune):
+            self._close_recording()
+
+        try:
+            if "rate" in p:
+                self.sdr.sample_rate = p["rate"]
+            if "center" in p:
+                self.sdr.center_freq = p["center"]
+            if "gain" in p:
+                self.sdr.gain = p["gain"]
+            if "ppm" in p and p["ppm"] != 0:
+                try:
+                    self.sdr.freq_correction = p["ppm"]
+                except Exception:
+                    pass  # librtlsdr errors if value unchanged
+        except Exception as e:
+            self.status.emit(f"SDR setting failed: {e}")
+
+        if "bias_tee" in p:
+            try:
+                self.sdr.set_bias_tee(bool(p["bias_tee"]))
+            except Exception as e:
+                self.status.emit(f"Bias tee not available: {e}")
+
+        if "target" in p:
+            self.target_hz = p["target"]
+        if "squelch" in p:
+            self.squelch_db = p["squelch"]
+        if "demod_opts" in p:
+            self.demod.set_options(**p["demod_opts"])
+
+        if "rate" in p or "mode" in p:
+            if "mode" in p:
+                self.demod.mode = p["mode"]
+            self._configure_demod()
+        elif "center" in p or "target" in p:
+            if self._demod_ok:
+                self.demod.set_offset(self.target_hz - self.sdr.center_freq)
+
+        if retune:
+            # drop samples captured before the change took effect
+            while True:
+                try:
+                    self._q.get_nowait()
+                except queue.Empty:
+                    break
+            self._flush = 2
+            if self._demod_ok:
+                self.demod.mute_for(0.1)
+
+        if "rec_start" in p:
+            self._open_recording(p["rec_start"])
+
+    def _configure_demod(self):
+        try:
+            self.demod.configure(float(self.sdr.sample_rate),
+                                 self.target_hz - self.sdr.center_freq)
+            self._demod_ok = True
+        except ValueError as e:
+            self._demod_ok = False
+            self.status.emit(f"Audio off: {e}")
+
+    def _open_recording(self, meta: dict):
+        rec_dir = Path(meta.pop("dir", None) or (HERE / "recordings"))
+        try:
+            rec_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            self.status.emit(f"Can't create recording folder {rec_dir}: {e}")
+            return
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        name = f"{stamp}_{meta['target_hz'] / 1e6:.5f}MHz_{int(self.sdr.sample_rate)}sps"
+        self._rec_path = rec_dir / f"{name}.cu8"
+        meta = dict(meta)
+        meta.update(
+            format="cu8 interleaved I/Q",
+            center_hz=float(self.sdr.center_freq),
+            sample_rate=float(self.sdr.sample_rate),
+            mode=self.demod.mode,
+            started=stamp,
+            tool=f"smashDR {VERSION}",
+        )
+        with open(self._rec_path.with_suffix(".json"), "w") as f:
+            json.dump(meta, f, indent=2)
+        self._rec = open(self._rec_path, "wb")
+        self._rec_bytes = 0
+        self.status.emit(f"Recording -> {self._rec_path}")
+
+    def _close_recording(self):
+        if self._rec:
+            self._rec.close()
+            mb = self._rec_bytes / 1e6
+            self.status.emit(f"Saved {self._rec_path.name} ({mb:.1f} MB)")
+        self._rec = None
+
+    def _channel_above_floor(self, spec, center, rate):
+        half = MODES[self.demod.mode]["half_bw"]
+        binw = rate / FFT_SIZE
+        c = int(round((self.target_hz - center) / binw + FFT_SIZE / 2))
+        h = max(1, int(np.ceil(half / binw)))
+        lo, hi = max(0, c - h), min(FFT_SIZE, c + h + 1)
+        if lo >= hi:
+            return 0.0
+        return float(spec[lo:hi].max() - np.median(spec))
+
+    def run(self):
+        self._configure_demod()
+        self._cap = AsyncCapture(self.sdr, READ_BYTES, self._q)
+        self._cap.start()
+        while self._running:
+            self._apply_pending()
+            try:
+                raw = self._q.get(timeout=0.5)
+            except queue.Empty:
+                if self._cap.error:
+                    self.status.emit(f"Capture stopped: {self._cap.error}")
+                    time.sleep(0.5)
+                continue
+
+            if self._flush:
+                self._flush -= 1
+                continue
+
+            if self._rec:
+                self._rec.write(raw)
+                self._rec_bytes += len(raw)
+
+            u8 = np.frombuffer(raw, dtype=np.uint8)
+            clip = 100.0 * np.count_nonzero((u8 == 0) | (u8 == 255)) / len(u8)
+            iq = cu8_to_iq(raw)
+            spec = power_spectrum_db(iq)
+            center = float(self.sdr.center_freq)
+            rate = float(self.sdr.sample_rate)
+
+            snr = self._channel_above_floor(spec, center, rate)
+            sq_open = self.squelch_db <= 0 or snr >= self.squelch_db
+            if self._demod_ok:
+                pcm = self.demod.process(iq, sq_open)
+                self.audio.emit(pcm.tobytes())
+
+            stats = {"clip": clip, "snr": snr, "sq_open": sq_open,
+                     "drops": self._cap.dropped,
+                     "rec_mb": self._rec_bytes / 1e6 if self._rec else None}
+            self.frame.emit(spec, center, rate, stats)
+
+        self._cap.stop()
+        self._cap.join(timeout=2.0)
+        self._close_recording()
+
+
+# --------------------------------------------------------------------------
+# Plot helpers
+# --------------------------------------------------------------------------
+class TuneViewBox(pg.ViewBox):
+    """ViewBox where the wheel tunes instead of zooming, and dragging does nothing."""
+
+    def __init__(self, on_wheel, **kw):
+        super().__init__(**kw)
+        self._on_wheel = on_wheel
+        self.setMouseEnabled(x=False, y=False)
+        self.setMenuEnabled(False)
+
+    def wheelEvent(self, ev, axis=None):
+        d = ev.delta() if hasattr(ev, "delta") else ev.angleDelta().y()
+        if d:
+            self._on_wheel(1 if d > 0 else -1)
+        ev.accept()
+
+    def mouseDragEvent(self, ev, axis=None):
+        ev.ignore()
+
+
+class BandStrip(pg.PlotWidget):
+    """Coloured band-plan segments for the visible span (x in MHz)."""
+
+    def __init__(self, on_wheel):
+        super().__init__(viewBox=TuneViewBox(on_wheel))
+        self.setFixedHeight(30)
+        self.hideAxis("left")
+        self.hideAxis("bottom")
+        self.setYRange(0, 1, padding=0)
+        self._items = []
+        self._span = None
+
+    def redraw(self, lo_hz: float, hi_hz: float):
+        if self._span == (lo_hz, hi_hz):
+            return
+        self._span = (lo_hz, hi_hz)
+        for it in self._items:
+            self.removeItem(it)
+        self._items = []
+        span_mhz = (hi_hz - lo_hz) / 1e6
+        for lo, hi, cat, label, _m, _s in bandplan.in_span(lo_hz, hi_hz):
+            r, g, b = bandplan.CATEGORIES[cat][1]
+            rect = QtWidgets.QGraphicsRectItem(lo, 0.08, hi - lo, 0.84)
+            rect.setBrush(pg.mkBrush(r, g, b, 150))
+            rect.setPen(pg.mkPen(r, g, b, 230))
+            self.addItem(rect)
+            self._items.append(rect)
+            vis_lo, vis_hi = max(lo, lo_hz / 1e6), min(hi, hi_hz / 1e6)
+            if vis_hi - vis_lo > 0.12 * span_mhz:
+                t = pg.TextItem(label, color=(255, 255, 255), anchor=(0.5, 0.5))
+                t.setPos((vis_lo + vis_hi) / 2, 0.5)
+                self.addItem(t)
+                self._items.append(t)
+
+
+# --------------------------------------------------------------------------
+# Main window
+# --------------------------------------------------------------------------
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self, sdr: RtlSdr, opts: dict):
+        super().__init__()
+        self.setWindowTitle(f"smashDR {VERSION}")
+        self.resize(1250, 860)
+        self.sdr = sdr
+        self.opts = opts
+
+        self.target_hz = int(round(float(opts["freq_mhz"]) * 1e6))
+        self.mode = opts["mode"]
+        self.step_hz = int(opts["step_hz"])
+        self._band_label = None
+        self.center_hz = None
+        self.rate_hz = None
+        self.freqs_mhz = None
+        self.avg = None
+        self.wf = np.full((WF_ROWS, FFT_SIZE), -120.0, dtype=np.float32)
+
+        self.reader = SdrReader(sdr, opts)
+
+        tabs = QtWidgets.QTabWidget()
+        tabs.addTab(self._build_receiver_tab(), "Receiver")
+        tabs.addTab(self._build_settings_tab(), "Settings")
+        self.setCentralWidget(tabs)
+
+        self.audio_out = audio.AudioOut() if audio else None
+        if self.audio_out:
+            self.audio_out.set_volume((opts["volume"] / 100) ** 2)
+            self._fill_audio_devices(select_key=opts.get("audio_device_id"))
+        self.reader.audio.connect(self._on_audio)
+        self.reader.frame.connect(self.on_frame)
+        self.reader.status.connect(self.status_lbl.setText)
+
+        self._apply_mode_ui()
+        self._tune(self.target_hz, apply_band_defaults=False)
+        self.reader.start()
+
+    # ======================================================================
+    # Receiver tab
+    # ======================================================================
+    def _build_receiver_tab(self):
+        opts = self.opts
+
+        # --- row 1: VFO, band label, modes ---
+        self.vfo = FreqDisplay(self.target_hz)
+        self.vfo.step_hz = self.step_hz
+        self.vfo.changed.connect(lambda hz: self._tune(hz))
+        mhz = QtWidgets.QLabel("MHz")
+        self.band_lbl = QtWidgets.QLabel("")
+        f = self.band_lbl.font()
+        f.setPointSize(f.pointSize() + 2)
+        self.band_lbl.setFont(f)
+
+        self.mode_group = QtWidgets.QButtonGroup(self)
+        self.mode_group.setExclusive(True)
+        mode_row = QtWidgets.QHBoxLayout()
+        mode_row.setSpacing(2)
+        self.mode_btns = {}
+        for m in MODES:
+            b = QtWidgets.QPushButton(m)
+            b.setCheckable(True)
+            b.setMinimumWidth(56)
+            self.mode_group.addButton(b)
+            self.mode_btns[m] = b
+            mode_row.addWidget(b)
+            b.clicked.connect(lambda _c, mm=m: self._set_mode(mm))
+
+        row1 = QtWidgets.QHBoxLayout()
+        row1.addWidget(self.vfo)
+        row1.addWidget(mhz)
+        row1.addSpacing(16)
+        row1.addWidget(self.band_lbl)
+        row1.addStretch(1)
+        row1.addLayout(mode_row)
+
+        # --- row 2: step, squelch, meter, volume, mute, record ---
+        self.step_box = QtWidgets.QComboBox()
+        for s in STEPS_HZ:
+            self.step_box.addItem(self._step_text(s), s)
+        self._select_step(self.step_hz)
+        self.step_box.currentIndexChanged.connect(
+            lambda _i: self._set_step(self.step_box.currentData()))
+
+        self.sq_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.sq_slider.setRange(0, 60)
+        self.sq_slider.setFixedWidth(120)
+        self.sq_slider.setValue(int(opts["squelch_db"]))
+        self.sq_slider.setToolTip("Squelch: dB above noise floor. 0 = always open.")
+        self.sq_val = QtWidgets.QLabel()
+        self.sq_val.setMinimumWidth(42)
+        self.sq_slider.valueChanged.connect(self._set_squelch)
+        self._set_squelch(self.sq_slider.value())
+
+        self.meter = LevelMeter()
+
+        self.vol_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.vol_slider.setRange(0, 100)
+        self.vol_slider.setFixedWidth(110)
+        self.vol_slider.setValue(int(opts["volume"]))
+        self.vol_slider.valueChanged.connect(self._set_volume)
+
+        self.mute_chk = QtWidgets.QCheckBox("Mute")
+        self.mute_chk.setChecked(bool(opts.get("mute", False)))
+
+        self.rec_btn = QtWidgets.QPushButton("Record IQ")
+        self.rec_btn.setCheckable(True)
+        self.rec_btn.toggled.connect(self.toggle_record)
+
+        row2 = QtWidgets.QHBoxLayout()
+        for w in (QtWidgets.QLabel("Step"), self.step_box,
+                  QtWidgets.QLabel("Squelch"), self.sq_slider, self.sq_val):
+            row2.addWidget(w)
+        row2.addWidget(self.meter, 1)
+        for w in (QtWidgets.QLabel("Vol"), self.vol_slider, self.mute_chk, self.rec_btn):
+            row2.addWidget(w)
+
+        # --- band strip, spectrum, waterfall ---
+        self.band_strip = BandStrip(self._wheel_tune)
+        self.spec_plot = pg.PlotWidget(viewBox=TuneViewBox(self._wheel_tune))
+        self.spec_plot.setLabel("left", "dBFS")
+        self.spec_plot.setYRange(-110, -10, padding=0)
+        self.spec_plot.showGrid(x=True, y=True, alpha=0.25)
+        self.spec_curve = self.spec_plot.plot(pen=pg.mkPen("#4fc3f7", width=1))
+        self.chan_region = pg.LinearRegionItem(movable=False,
+                                               brush=pg.mkBrush(255, 213, 79, 40))
+        self.spec_plot.addItem(self.chan_region)
+        self.marker = pg.InfiniteLine(angle=90, movable=True,
+                                      pen=pg.mkPen("#ffd54f", width=1))
+        self.marker.sigPositionChangeFinished.connect(
+            lambda: self._tune(self.marker.value() * 1e6, snap=True))
+        self.spec_plot.addItem(self.marker)
+        self.band_strip.setXLink(self.spec_plot)
+
+        self.wf_plot = pg.PlotWidget(viewBox=TuneViewBox(self._wheel_tune))
+        self.wf_plot.setXLink(self.spec_plot)
+        self.wf_plot.hideAxis("left")
+        self.wf_plot.setLabel("bottom", "MHz")
+        self.wf_img = pg.ImageItem()
+        self._set_palette(opts["palette"])
+        self.wf_plot.addItem(self.wf_img)
+        self.wf_marker = pg.InfiniteLine(angle=90, movable=False,
+                                         pen=pg.mkPen("#ffd54f", width=1))
+        self.wf_plot.addItem(self.wf_marker)
+        self.spec_plot.hideAxis("bottom")
+
+        for p in (self.band_strip, self.spec_plot, self.wf_plot):
+            p.scene().sigMouseClicked.connect(
+                lambda ev, plot=p: self._plot_clicked(ev, plot))
+
+        self.info = QtWidgets.QLabel("Starting...")
+        self.info.setFont(QtGui.QFont("Consolas", 10))
+        self.status_lbl = QtWidgets.QLabel("")
+
+        plots = QtWidgets.QWidget()
+        pl = QtWidgets.QVBoxLayout(plots)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(0)
+        pl.addWidget(self.band_strip)
+        pl.addWidget(self.spec_plot, 1)
+
+        split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+        split.addWidget(plots)
+        split.addWidget(self.wf_plot)
+        split.setSizes([360, 420])
+
+        lay = QtWidgets.QVBoxLayout()
+        lay.addLayout(row1)
+        lay.addLayout(row2)
+        lay.addWidget(split, 1)
+        lay.addWidget(self.info)
+        lay.addWidget(self.status_lbl)
+        w = QtWidgets.QWidget()
+        w.setLayout(lay)
+        return w
+
+    # ======================================================================
+    # Settings tab
+    # ======================================================================
+    def _build_settings_tab(self):
+        opts = self.opts
+
+        # --- Radio ---
+        self.dev_box = QtWidgets.QComboBox()
+        devs = list_devices() or [f"#{opts['device_index']}"]
+        self.dev_box.addItems(devs)
+        self.dev_box.setCurrentIndex(min(int(opts["device_index"]), len(devs) - 1))
+        self.dev_box.currentIndexChanged.connect(self._device_chosen)
+        dev_note = QtWidgets.QLabel("")
+        self._dev_note = dev_note
+
+        self.rate_box = QtWidgets.QComboBox()
+        for r in RATES_MSPS:
+            self.rate_box.addItem(f"{r} MS/s", r * 1e6)
+        self.rate_box.setCurrentIndex(
+            min(range(len(RATES_MSPS)), key=lambda i: abs(RATES_MSPS[i] - float(opts["rate_msps"]))))
+        self.rate_box.currentIndexChanged.connect(self._set_rate)
+
+        self._gains = list(self.sdr.valid_gains_db)
+        self.gain_auto = QtWidgets.QCheckBox("Auto")
+        self.gain_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.gain_slider.setRange(0, len(self._gains) - 1)
+        self.gain_lbl = QtWidgets.QLabel()
+        self.gain_lbl.setMinimumWidth(60)
+        if opts["gain"] == "auto":
+            self.gain_auto.setChecked(True)
+            self.gain_slider.setValue(len(self._gains) // 2)
+        else:
+            g = float(opts["gain"])
+            self.gain_slider.setValue(min(range(len(self._gains)),
+                                          key=lambda i: abs(self._gains[i] - g)))
+        self.gain_slider.setEnabled(not self.gain_auto.isChecked())
+        self._update_gain_label()
+        self.gain_auto.toggled.connect(self._gain_changed)
+        self.gain_slider.valueChanged.connect(self._gain_changed)
+        gain_row = QtWidgets.QHBoxLayout()
+        gain_row.addWidget(self.gain_auto)
+        gain_row.addWidget(self.gain_slider, 1)
+        gain_row.addWidget(self.gain_lbl)
+
+        self.ppm_spin = QtWidgets.QSpinBox()
+        self.ppm_spin.setRange(-100, 100)
+        self.ppm_spin.setValue(int(opts["ppm"]))
+        self.ppm_spin.valueChanged.connect(lambda v: self.reader.request(ppm=v))
+
+        self.bias_chk = QtWidgets.QCheckBox("Power an LNA / active antenna through the coax")
+        self.bias_chk.setChecked(bool(opts["bias_tee"]))
+        self.bias_chk.toggled.connect(lambda on: self.reader.request(bias_tee=on))
+
+        self.auto_band_chk = QtWidgets.QCheckBox(
+            "Switch mode and step from the band plan when tuning into a new band")
+        self.auto_band_chk.setChecked(bool(opts["auto_band"]))
+
+        radio = QtWidgets.QGroupBox("Radio")
+        rf = QtWidgets.QFormLayout(radio)
+        dev_row = QtWidgets.QHBoxLayout()
+        dev_row.addWidget(self.dev_box, 1)
+        dev_row.addWidget(dev_note)
+        rf.addRow("Device", dev_row)
+        rf.addRow("Sample rate", self.rate_box)
+        rf.addRow("Gain", gain_row)
+        rf.addRow("PPM correction", self.ppm_spin)
+        rf.addRow("Bias tee", self.bias_chk)
+        rf.addRow("Band plan", self.auto_band_chk)
+
+        # --- Audio ---
+        self.audio_dev_box = QtWidgets.QComboBox()
+        self.audio_dev_box.setMinimumWidth(380)
+        self.audio_dev_box.currentIndexChanged.connect(self._audio_device_chosen)
+        refresh = QtWidgets.QPushButton("Refresh")
+        refresh.clicked.connect(lambda: self._fill_audio_devices(
+            select_key=self.opts.get("audio_device_id")))
+        tone = QtWidgets.QPushButton("Test tone")
+        tone.clicked.connect(lambda: self.audio_out and self.audio_out.test_tone())
+        self.audio_status = QtWidgets.QLabel("")
+        self.audio_status.setWordWrap(True)
+        dev_row2 = QtWidgets.QHBoxLayout()
+        dev_row2.addWidget(self.audio_dev_box, 1)
+        dev_row2.addWidget(refresh)
+        dev_row2.addWidget(tone)
+
+        self.nfm_de_box = QtWidgets.QComboBox()
+        for label, us in (("750 µs (standard)", 750), ("530 µs", 530), ("Off", 0)):
+            self.nfm_de_box.addItem(label, us)
+        self.nfm_de_box.setCurrentIndex(max(0, self.nfm_de_box.findData(int(opts["nfm_deemph_us"]))))
+        self.wfm_de_box = QtWidgets.QComboBox()
+        for label, us in (("75 µs (Americas)", 75), ("50 µs (Europe)", 50), ("Off", 0)):
+            self.wfm_de_box.addItem(label, us)
+        self.wfm_de_box.setCurrentIndex(max(0, self.wfm_de_box.findData(int(opts["wfm_deemph_us"]))))
+        self.ctcss_chk = QtWidgets.QCheckBox("Filter out CTCSS tones (cut below 300 Hz)")
+        self.ctcss_chk.setChecked(bool(opts["ctcss_filter"]))
+        for w in (self.nfm_de_box, self.wfm_de_box):
+            w.currentIndexChanged.connect(self._demod_opts_changed)
+        self.ctcss_chk.toggled.connect(self._demod_opts_changed)
+
+        audio_box = QtWidgets.QGroupBox("Audio")
+        af = QtWidgets.QFormLayout(audio_box)
+        af.addRow("Output device", dev_row2)
+        af.addRow("", self.audio_status)
+        af.addRow("NFM de-emphasis", self.nfm_de_box)
+        af.addRow("WFM de-emphasis", self.wfm_de_box)
+        af.addRow("CTCSS", self.ctcss_chk)
+        if audio is None:
+            self.audio_status.setText("QtMultimedia not available - audio disabled.")
+            self.audio_dev_box.setEnabled(False)
+
+        # --- Display ---
+        self.wf_auto = QtWidgets.QCheckBox("Auto (follow noise floor)")
+        self.wf_auto.setChecked(bool(opts["wf_auto"]))
+        self.wf_min = QtWidgets.QSpinBox()
+        self.wf_max = QtWidgets.QSpinBox()
+        for sp, v in ((self.wf_min, opts["wf_min"]), (self.wf_max, opts["wf_max"])):
+            sp.setRange(-150, 20)
+            sp.setSuffix(" dB")
+            sp.setValue(int(v))
+            sp.setEnabled(not self.wf_auto.isChecked())
+        self.wf_auto.toggled.connect(lambda on: (self.wf_min.setEnabled(not on),
+                                                 self.wf_max.setEnabled(not on)))
+        wf_row = QtWidgets.QHBoxLayout()
+        wf_row.addWidget(self.wf_auto)
+        wf_row.addWidget(QtWidgets.QLabel("min"))
+        wf_row.addWidget(self.wf_min)
+        wf_row.addWidget(QtWidgets.QLabel("max"))
+        wf_row.addWidget(self.wf_max)
+        wf_row.addStretch(1)
+
+        self.pal_box = QtWidgets.QComboBox()
+        self.pal_box.addItems(PALETTES)
+        self.pal_box.setCurrentText(opts["palette"])
+        self.pal_box.currentTextChanged.connect(self._set_palette)
+
+        self.avg_box = QtWidgets.QComboBox()
+        self.avg_box.addItems(list(AVERAGING))
+        self.avg_box.setCurrentText(opts["averaging"])
+
+        display = QtWidgets.QGroupBox("Display")
+        df = QtWidgets.QFormLayout(display)
+        df.addRow("Waterfall range", wf_row)
+        df.addRow("Palette", self.pal_box)
+        df.addRow("Spectrum averaging", self.avg_box)
+
+        # --- Recording ---
+        self.rec_dir_edit = QtWidgets.QLineEdit(opts["rec_dir"] or str(HERE / "recordings"))
+        browse = QtWidgets.QPushButton("Browse…")
+        browse.clicked.connect(self._browse_rec_dir)
+        rec_row = QtWidgets.QHBoxLayout()
+        rec_row.addWidget(self.rec_dir_edit, 1)
+        rec_row.addWidget(browse)
+        recording = QtWidgets.QGroupBox("Recording")
+        recf = QtWidgets.QFormLayout(recording)
+        recf.addRow("Folder", rec_row)
+
+        lay = QtWidgets.QVBoxLayout()
+        for g in (radio, audio_box, display, recording):
+            lay.addWidget(g)
+        lay.addStretch(1)
+        inner = QtWidgets.QWidget()
+        inner.setLayout(lay)
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(inner)
+        return scroll
+
+    # ======================================================================
+    # Tuning
+    # ======================================================================
+    @staticmethod
+    def _step_text(s):
+        return f"{s / 1000:g} kHz" if s < 1_000_000 else f"{s / 1e6:g} MHz"
+
+    def _select_step(self, s):
+        i = self.step_box.findData(int(s))
+        if i < 0:
+            self.step_box.addItem(self._step_text(int(s)), int(s))
+            i = self.step_box.count() - 1
+        self.step_box.blockSignals(True)
+        self.step_box.setCurrentIndex(i)
+        self.step_box.blockSignals(False)
+
+    def _set_step(self, s):
+        self.step_hz = int(s)
+        self.vfo.step_hz = self.step_hz
+
+    def _offset_hz(self):
+        rate = self.rate_box.currentData()
+        return min(300e3, rate * 0.2)
+
+    def _wheel_tune(self, direction: int):
+        base = round(self.target_hz / self.step_hz) * self.step_hz
+        self._tune(base + direction * self.step_hz)
+
+    def _tune(self, hz, snap=False, apply_band_defaults=True):
+        hz = float(hz)
+        if snap:
+            hz = round(hz / self.step_hz) * self.step_hz
+        hz = int(round(min(max(hz, 24e6), 1766e6)))
+        self.target_hz = hz
+        self.vfo.setValue(hz)
+
+        band = bandplan.lookup(hz)
+        label = band[3] if band else None
+        if apply_band_defaults and label != self._band_label and band \
+                and self.auto_band_chk.isChecked():
+            if band[4] and band[4] != self.mode:
+                self._set_mode(band[4])
+            if band[5]:
+                self._select_step(band[5])
+                self._set_step(band[5])
+        self._band_label = label
+        self.band_lbl.setText(bandplan.describe(hz))
+
+        mhz = hz / 1e6
+        self.marker.blockSignals(True)
+        self.marker.setValue(mhz)
+        self.marker.blockSignals(False)
+        self.wf_marker.setValue(mhz)
+        self._update_region()
+        self.reader.request(target=float(hz))
+
+        # re-centre the hardware if the channel would fall off the span
+        if self.center_hz is not None and self.rate_hz:
+            half = MODES[self.mode]["half_bw"]
+            if abs(hz - self.center_hz) + half > 0.42 * self.rate_hz:
+                self.reader.request(center=hz + self._offset_hz())
+                self.rec_btn.setChecked(False)
+        elif self.center_hz is None:
+            self.reader.request(center=hz + self._offset_hz())
+
+    def _update_region(self):
+        half = MODES[self.mode]["half_bw"] / 1e6
+        mhz = self.target_hz / 1e6
+        self.chan_region.setRegion((mhz - half, mhz + half))
+
+    def _set_mode(self, mode):
+        self.mode = mode
+        self._apply_mode_ui()
+        self.reader.request(mode=mode)
+
+    def _apply_mode_ui(self):
+        btn = self.mode_btns.get(self.mode)
+        if btn:
+            btn.setChecked(True)
+        if hasattr(self, "chan_region"):
+            self._update_region()
+
+    def _plot_clicked(self, ev, plot):
+        vb = plot.plotItem.vb
+        if ev.button() == QtCore.Qt.MouseButton.LeftButton and \
+                vb.sceneBoundingRect().contains(ev.scenePos()):
+            self._tune(vb.mapSceneToView(ev.scenePos()).x() * 1e6, snap=True)
+
+    # ======================================================================
+    # Controls
+    # ======================================================================
+    def _set_squelch(self, v):
+        self.sq_val.setText("open" if v == 0 else f"{v} dB")
+        self.reader.request(squelch=float(v))
+
+    def _set_volume(self, v):
+        if self.audio_out:
+            self.audio_out.set_volume((v / 100) ** 2)
+
+    def _set_rate(self, _idx):
+        self.reader.request(rate=self.rate_box.currentData(),
+                            center=self.target_hz + self._offset_hz())
+        self.rec_btn.setChecked(False)
+
+    def _update_gain_label(self):
+        self.gain_lbl.setText("auto" if self.gain_auto.isChecked()
+                              else f"{self._gains[self.gain_slider.value()]:.1f} dB")
+
+    def _gain_text(self):
+        return "auto" if self.gain_auto.isChecked() else \
+            f"{self._gains[self.gain_slider.value()]:.1f}"
+
+    def _gain_changed(self, *_):
+        self.gain_slider.setEnabled(not self.gain_auto.isChecked())
+        self._update_gain_label()
+        g = self._gain_text()
+        self.reader.request(gain="auto" if g == "auto" else float(g))
+        self.rec_btn.setChecked(False)
+
+    def _device_chosen(self, idx):
+        self.opts["device_index"] = idx
+        self._dev_note.setText("applies after restart" if idx != self._open_device_index() else "")
+
+    def _open_device_index(self):
+        return int(self.opts.get("_opened_device", 0))
+
+    def _demod_opts_changed(self, *_):
+        self.reader.request(demod_opts={
+            "nfm_deemph_us": self.nfm_de_box.currentData(),
+            "wfm_deemph_us": self.wfm_de_box.currentData(),
+            "ctcss_filter": self.ctcss_chk.isChecked(),
+        })
+
+    def _set_palette(self, name):
+        try:
+            self.wf_img.setColorMap(pg.colormap.get(name))
+        except Exception:
+            self.wf_img.setColorMap(pg.colormap.get("inferno"))
+
+    def _browse_rec_dir(self):
+        d = QtWidgets.QFileDialog.getExistingDirectory(self, "Recording folder",
+                                                       self.rec_dir_edit.text())
+        if d:
+            self.rec_dir_edit.setText(d)
+
+    def toggle_record(self, on):
+        if on:
+            self.reader.request(rec_start={"target_hz": float(self.target_hz),
+                                           "gain": self._gain_text(),
+                                           "ppm": self.ppm_spin.value(),
+                                           "dir": self.rec_dir_edit.text().strip()})
+            self.rec_btn.setText("Stop rec")
+        else:
+            self.reader.request(rec_stop=True)
+            self.rec_btn.setText("Record IQ")
+
+    # ======================================================================
+    # Audio
+    # ======================================================================
+    def _fill_audio_devices(self, select_key=None):
+        if not self.audio_out:
+            return
+        self._audio_devs = audio.output_devices()
+        default_key = audio.device_key(audio.default_device())
+        self.audio_dev_box.blockSignals(True)
+        self.audio_dev_box.clear()
+        idx = 0
+        for i, dev in enumerate(self._audio_devs):
+            key = audio.device_key(dev)
+            label = dev.description() + ("  (system default)" if key == default_key else "")
+            self.audio_dev_box.addItem(label)
+            if key == (select_key or default_key):
+                idx = i
+        self.audio_dev_box.blockSignals(False)
+        if self._audio_devs:
+            self.audio_dev_box.setCurrentIndex(idx)
+            self._audio_device_chosen(idx)
+        else:
+            self.audio_status.setText("No audio output devices found.")
+
+    def _audio_device_chosen(self, idx):
+        if not self.audio_out or idx < 0 or idx >= len(self._audio_devs):
+            return
+        dev = self._audio_devs[idx]
+        try:
+            desc = self.audio_out.open(dev)
+            self.audio_status.setText(f"Playing on: {desc}")
+            self.opts["audio_device_id"] = audio.device_key(dev)
+            self.opts["audio_device_name"] = dev.description()
+        except Exception as e:
+            self.audio_status.setText(f"Could not open {dev.description()}: {e}")
+
+    def _on_audio(self, pcm: bytes):
+        if self.audio_out and not self.mute_chk.isChecked():
+            self.audio_out.write(pcm)
+
+    # ======================================================================
+    # Frames
+    # ======================================================================
+    def on_frame(self, spec, center, rate, stats):
+        if center != self.center_hz or rate != self.rate_hz:
+            self.center_hz, self.rate_hz = center, rate
+            bins = (np.arange(FFT_SIZE) - FFT_SIZE / 2) * (rate / FFT_SIZE)
+            self.freqs_mhz = (center + bins) / 1e6
+            self.avg = spec.copy()
+            self.wf[:] = np.median(spec)
+            f0 = self.freqs_mhz[0]
+            span = rate / 1e6
+            self.wf_img.setRect(QtCore.QRectF(f0, 0, span, WF_ROWS))
+            self.spec_plot.setXRange(f0, f0 + span, padding=0)
+            self.band_strip.redraw(center - rate / 2, center + rate / 2)
+
+        alpha = AVERAGING.get(self.avg_box.currentText(), 0.35)
+        self.avg = (1 - alpha) * self.avg + alpha * spec
+        self.spec_curve.setData(self.freqs_mhz, self.avg)
+
+        self.wf[:-1] = self.wf[1:]
+        self.wf[-1] = spec
+        floor = float(np.median(spec))
+        if self.wf_auto.isChecked():
+            levels = (floor - 5, floor + 45)
+        else:
+            levels = (self.wf_min.value(), max(self.wf_max.value(), self.wf_min.value() + 1))
+        self.wf_img.setImage(self.wf, autoLevels=False, levels=levels)
+
+        self.meter.set_values(stats["snr"], self.sq_slider.value(), stats["sq_open"])
+
+        clip_txt = f"clip {stats['clip']:.3f}%"
+        if stats["clip"] > 0.1:
+            clip_txt += "  << OVERLOAD, lower gain"
+        extra = f"   REC {stats['rec_mb']:.0f} MB" if stats["rec_mb"] is not None else ""
+        if stats["drops"]:
+            extra += f"   DROPPED {stats['drops']} blocks"
+        self.info.setText(f"{'SQ OPEN' if stats['sq_open'] else 'SQ shut'}   "
+                          f"{stats['snr']:4.0f} dB above floor   floor {floor:6.1f} dBFS   "
+                          f"{clip_txt}   {rate / 1e6:.2f} MS/s   gain {self._gain_text()}{extra}")
+
+    # ======================================================================
+    # Shutdown
+    # ======================================================================
+    def closeEvent(self, ev):
+        self.reader.stop()
+        self.reader.wait(3000)
+        if self.audio_out:
+            self.audio_out.close()
+        self.opts.update(
+            freq_mhz=round(self.target_hz / 1e6, 6),
+            mode=self.mode,
+            step_hz=self.step_hz,
+            gain=self._gain_text(),
+            rate_msps=self.rate_box.currentData() / 1e6,
+            ppm=self.ppm_spin.value(),
+            bias_tee=self.bias_chk.isChecked(),
+            auto_band=self.auto_band_chk.isChecked(),
+            squelch_db=self.sq_slider.value(),
+            volume=self.vol_slider.value(),
+            mute=self.mute_chk.isChecked(),
+            nfm_deemph_us=self.nfm_de_box.currentData(),
+            wfm_deemph_us=self.wfm_de_box.currentData(),
+            ctcss_filter=self.ctcss_chk.isChecked(),
+            wf_auto=self.wf_auto.isChecked(),
+            wf_min=self.wf_min.value(),
+            wf_max=self.wf_max.value(),
+            palette=self.pal_box.currentText(),
+            averaging=self.avg_box.currentText(),
+            rec_dir=self.rec_dir_edit.text().strip(),
+        )
+        self.opts.pop("_opened_device", None)
+        try:
+            cfg.save(self.opts)
+        except OSError as e:
+            print("[!] Could not save settings:", e)
+        super().closeEvent(ev)
+
+
+# --------------------------------------------------------------------------
+DEFAULTS = {
+    "freq_mhz": 851.0, "mode": "NFM", "step_hz": 12500,
+    "gain": "auto", "rate_msps": 2.4, "ppm": 0, "bias_tee": False, "device_index": 0,
+    "auto_band": True, "squelch_db": 10, "volume": 60, "mute": False,
+    "nfm_deemph_us": 750, "wfm_deemph_us": 75, "ctcss_filter": True,
+    "wf_auto": True, "wf_min": -90, "wf_max": -40, "palette": "inferno",
+    "averaging": "Medium", "rec_dir": "",
+}
+
+
+def resolve_options(args) -> dict:
+    opts = dict(DEFAULTS)
+    opts.update(cfg.load())
+    if opts.get("mode") not in MODES:
+        opts["mode"] = "NFM"
+    if args.freq is not None:
+        opts["freq_mhz"] = args.freq
+    if args.gain is not None:
+        opts["gain"] = args.gain
+    if args.rate is not None:
+        opts["rate_msps"] = args.rate
+    if args.ppm is not None:
+        opts["ppm"] = args.ppm
+    if args.device is not None:
+        opts["device_index"] = args.device
+    return opts
+
+
+def open_sdr(opts) -> RtlSdr:
+    idx = int(opts["device_index"])
+    try:
+        sdr = RtlSdr(device_index=idx)
+    except Exception as e:
+        if idx != 0:
+            print(f"[!] Device #{idx} not available ({e}), trying #0")
+            opts["device_index"] = idx = 0
+            return open_sdr(opts)
+        print("\n[!] Could not open the RTL-SDR:", e)
+        print("    - Is another SDR app (SDR++, SDRTrunk, ...) holding it?")
+        print("    - Is the WinUSB driver installed? Zadig -> Options -> List All")
+        print("      Devices -> 'Blog V4' / 'Bulk-In, Interface (Interface 0)' -> WinUSB.\n")
+        sys.exit(1)
+    opts["_opened_device"] = idx
+
+    rate = float(opts["rate_msps"]) * 1e6
+    sdr.sample_rate = rate
+    sdr.center_freq = float(opts["freq_mhz"]) * 1e6 + min(300e3, rate * 0.2)
+    sdr.gain = "auto" if opts["gain"] == "auto" else float(opts["gain"])
+    if opts["ppm"]:
+        sdr.freq_correction = int(opts["ppm"])
+    if opts.get("bias_tee"):
+        try:
+            sdr.set_bias_tee(True)
+        except Exception as e:
+            print("[!] Bias tee not available:", e)
+    print(f"[ok] RTL-SDR #{idx} open: {sdr.sample_rate / 1e6:.3f} MS/s, "
+          f"centre {sdr.center_freq / 1e6:.5f} MHz, gain {sdr.gain}")
+    return sdr
+
+
+def main():
+    ap = argparse.ArgumentParser(description="smashDR receiver")
+    ap.add_argument("--freq", type=float, help="frequency in MHz")
+    ap.add_argument("--rate", type=float, help="sample rate in MS/s")
+    ap.add_argument("--gain", help="'auto' or dB")
+    ap.add_argument("--ppm", type=int)
+    ap.add_argument("--device", type=int)
+    args = ap.parse_args()
+
+    opts = resolve_options(args)
+    sdr = open_sdr(opts)
+    app = QtWidgets.QApplication(sys.argv)
+    win = MainWindow(sdr, opts)
+    win.show()
+    code = app.exec()
+    sdr.close()
+    sys.exit(code)
+
+
+if __name__ == "__main__":
+    main()

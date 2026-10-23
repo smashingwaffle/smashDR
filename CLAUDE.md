@@ -14,7 +14,8 @@
 - A Uniden SDS200 is available as ground truth when debugging decodes.
 
 ## Build order
-1. Probe: IQ off the V4, spectrum/waterfall, IQ recording, NFM audio + device settings  <- current
+1. Receiver: spectrum/waterfall, IQ recording, NFM/AM/WFM, VFO, band plan, settings  <- done
+1b. Scanner: memories, scan lists, band/range scan  <- next
 2. C4FM demod + symbol timing, run on recordings
 3. P25 Phase 1 frame sync + NID (BCH 63,16)
 4. Frame types (HDU/LDU/TSBK), FEC
@@ -25,12 +26,21 @@
 UX comes after the decode chain works.
 
 ## Code layout
-- `main.py` entry; `sdr_probe.py` receiver window + SDR reader thread
-- `dsp.py` block DSP with state (spectrum, StreamFir, NfmMonitor -> 48 kHz)
+- `main.py` entry; `receiver.py` main window, AsyncCapture (gap-free USB
+  thread) and SdrReader (processing thread)
+- `dsp.py` block DSP with state: Channelizer (NCO + FFT overlap-save
+  decimator), Demod (NFM/AM/WFM -> 48 kHz, gate, limiter, click-free switches)
+- `widgets.py` FreqDisplay (VFO) and LevelMeter
+- `bandplan.py` simplified US band plan, lookup() and in_span()
 - `audio.py` QtMultimedia output, converts to device's preferred format
 - `settings.py` settings.json store (not in git)
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
+
+## Testing
+PyQt6 can't be installed in Claude's sandbox (PyPI blocked), so the GUI is
+only statically checked there. DSP is verified offline against synthetic
+signals and Stefaan's recordings before every push.
 
 ## Develop against recordings
 `recordings/*.cu8` (interleaved uint8 IQ) + `.json` sidecar with centre,

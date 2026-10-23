@@ -1,14 +1,11 @@
 """
 smashDR entry point.
 
-For now this launches the SDR probe (spectrum, waterfall, IQ recording).
-As decoder stages land, this becomes the main app.
-
-Pass arguments straight through, e.g.:
-  python main.py --freq 851.0125 --gain 30
+  python main.py                     (uses last settings)
+  python main.py --freq 851.0125     (command line overrides saved settings)
 """
 
-import sdr_probe
+import receiver
 
 if __name__ == "__main__":
-    sdr_probe.main()
+    receiver.main()
