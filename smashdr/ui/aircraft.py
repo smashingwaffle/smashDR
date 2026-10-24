@@ -127,8 +127,8 @@ var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom
   className: 'osm-dark', attribution: '&copy; OpenStreetMap contributors'});
 var layers = {'Dark (Esri)': dark, 'OpenStreetMap': osm};
 if (cartoKey) {
-  var carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key='
-      + encodeURIComponent(cartoKey), {subdomains: 'abcd', maxNativeZoom: 18, maxZoom: 20,
+  var carto = L.tileLayer('https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key='
+      + encodeURIComponent(cartoKey), {maxNativeZoom: 18, maxZoom: 20,
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO'});
   layers = Object.assign({'Dark (CARTO)': carto}, layers);
   carto.addTo(map);
