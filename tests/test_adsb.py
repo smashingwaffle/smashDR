@@ -75,7 +75,59 @@ def test_tracker():
     assert ok
 
 
+def _with_parity(body: bytes, addr: int = 0) -> bytes:
+    """Append CRC (xor address for DF4/5/20/21) to a message body."""
+    rem = adsb.crc24(body)
+    return body + (rem ^ addr).to_bytes(3, "big")
+
+
+def _ac13(alt_ft):
+    n = (alt_ft + 1000) // 25
+    # put the 11-bit N around M (bit 7) = 0 and Q (bit 9) = 1
+    hi6, b8, lo4 = (n >> 5) & 0x3F, (n >> 4) & 1, n & 0xF
+    return (hi6 << 7) | (b8 << 5) | (1 << 4) | lo4
+
+
+def _sq13(code: str):
+    a, b, c, d = (int(x) for x in code)
+    bits = [c & 1, a & 1, (c >> 1) & 1, (a >> 1) & 1, (c >> 2) & 1, (a >> 2) & 1, 0,
+            b & 1, d & 1, (b >> 1) & 1, (d >> 1) & 1, (b >> 2) & 1, (d >> 2) & 1]
+    v = 0
+    for x in bits:
+        v = (v << 1) | x
+    return v
+
+
+def test_modes():
+    addr = 0xA12345
+    df11 = _with_parity(bytes([11 << 3 | 5]) + addr.to_bytes(3, "big"))
+    first = (4 << 3) | 0b000                       # DF4, FS=0
+    v = (first << 24) | (0 << 19) | (_ac13(3300))  # DR/UM zero, AC13 in bits 20-32
+    df4 = _with_parity(v.to_bytes(4, "big"), addr)
+    v5 = ((5 << 3) << 24) | _sq13("1200")
+    df5 = _with_parity(v5.to_bytes(4, "big"), addr)
+    stranger = _with_parity(v.to_bytes(4, "big"), 0xABCDEF)    # never announced
+    assert adsb.icao(df4) == "A12345" and adsb.ac13_altitude(df4) == 3300
+    assert adsb.id13_squawk(df5) == "1200"
+    iq = modulate([df11, df4, df5, stranger, df4] * 10, snr_db=18)
+    rx = adsb.AdsbDemod()
+    got = []
+    for i in range(0, len(iq), 40_000):
+        got += rx.process(iq[i:i + 40_000])
+    kinds = [adsb.df_of(g) for g in got]
+    print(f"mode S: DF11 {kinds.count(11)}, DF4 {kinds.count(4)}, DF5 {kinds.count(5)}, "
+          f"stranger accepted {sum(g == stranger for g in got)}")
+    assert sum(g == stranger for g in got) == 0 and kinds.count(4) >= 15 and kinds.count(5) >= 8
+    tr = adsb.Tracker(34.0, -118.0)
+    for t, g in enumerate(got):
+        tr.update(g, float(t))
+    p = tr.planes["A12345"]
+    print("tracker mode S:", p["alt"], p["squawk"], "adsb" if p["adsb"] else "transponder only")
+    assert p["alt"] == 3300 and p["squawk"] == "1200" and not p["adsb"]
+
+
 if __name__ == "__main__":
     test_decode()
     test_demod()
     test_tracker()
+    test_modes()

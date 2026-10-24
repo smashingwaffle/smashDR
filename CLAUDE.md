@@ -105,6 +105,13 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   Airline logos: only user-supplied files in user/logos/<ICAO code>.png
   (never drawn or bundled by us). Default: Images.tail() generates an original
   tail-fin icon (palette colour + ICAO code), not a logo.
+  Mode S too: DF11 all-call (CRC remainder = II/SI) and DF17 fill a 'known
+  address' set; DF4/5/20/21 (address/parity, remainder = ICAO) are accepted only
+  for known addresses -> 'transponder only' rows with altitude/squawk, no position.
+  crc24(data) = parity of data (augmentation-free); icao() recovers AP addresses.
+  Helicopters: emitter category 7, hover (<35 kt above 400 ft), or adsbdb type
+  text (HELI_RX); types looked up in the background (<1/s), cached 30 days in
+  user/cache/aircraft.json; photos only fetched for the selected plane.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 

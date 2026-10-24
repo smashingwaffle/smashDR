@@ -30,7 +30,8 @@ CHARSET = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ##### ###############0123456789######"
 # CRC-24 (Mode S)
 # --------------------------------------------------------------------------
 def crc24(data: bytes) -> int:
-    """Remainder of the whole message; 0 for a valid DF17/18."""
+    """Mode S CRC of data (= the parity field for data without its last 3 bytes);
+    0 for a whole valid DF17/18 message."""
     crc = 0
     for byte in data:
         crc ^= byte << 16
@@ -39,6 +40,18 @@ def crc24(data: bytes) -> int:
             if crc & 0x1000000:
                 crc ^= 0x1000000 | CRC_POLY
     return crc & 0xFFFFFF
+
+
+def _crc_rem_batch(bits: np.ndarray, nbits: int) -> np.ndarray:
+    """bits: (n, >=nbits) -> int64 (n,) 24-bit CRC remainder over the first nbits."""
+    reg = bits[:, :nbits].astype(np.uint8).copy()
+    gen = np.array([(0x1FFF409 >> (24 - i)) & 1 for i in range(25)], dtype=np.uint8)
+    for i in range(nbits - 24):
+        lead = reg[:, i].astype(bool)
+        if lead.any():
+            reg[lead, i:i + 25] ^= gen
+    weights = (1 << np.arange(23, -1, -1)).astype(np.int64)
+    return reg[:, nbits - 24:nbits].astype(np.int64) @ weights
 
 
 def _crc_ok_batch(bits: np.ndarray) -> np.ndarray:
@@ -60,8 +73,11 @@ class AdsbDemod:
         self.tail = np.zeros(0, dtype=np.float32)
         self.messages = 0
         self.candidates = 0
+        self.clock = 0                        # samples processed
+        self.known = {}                       # ICAO int -> clock last seen (DF11/17/18)
 
     def process(self, iq: np.ndarray):
+        self.clock += len(iq)
         m = np.abs(iq).astype(np.float32)
         m = np.concatenate([self.tail, m])
         out = []
@@ -93,17 +109,41 @@ class AdsbDemod:
         pos = q[:, None] + PREAMBLE + 2 * np.arange(LONG_BITS)[None, :]
         bits = (m[pos] > m[pos + 1]).astype(np.uint8)
         df = (bits[:, 0] << 4) | (bits[:, 1] << 3) | (bits[:, 2] << 2) | (bits[:, 3] << 1) | bits[:, 4]
-        keep = (df == 17) | (df == 18)
-        q, bits = q[keep], bits[keep]
-        if len(q) == 0:
-            return []
-        good = _crc_ok_batch(bits)
-        out, last = [], -10 ** 9
-        for start, b in zip(q[good], bits[good]):
-            if start - last < NEED:                   # same message seen at an offset
+        found = []                                    # (start, nbits, bits)
+        # 1) self-checking messages: DF17/18 (CRC 0), DF11 all-call (CRC = II/SI code)
+        sel = np.flatnonzero((df == 17) | (df == 18))
+        if len(sel):
+            ok = _crc_rem_batch(bits[sel], 112) == 0
+            for k in sel[ok]:
+                found.append((q[k], 112, bits[k]))
+        sel = np.flatnonzero(df == 11)
+        if len(sel):
+            rem = _crc_rem_batch(bits[sel], 56)
+            for k in sel[(rem & 0xFFFF80) == 0]:
+                found.append((q[k], 56, bits[k]))
+        for _start, nb, b in found:
+            a = int.from_bytes(np.packbits(b[8:32]).tobytes(), "big")
+            self.known[a] = self.clock
+        # 2) address/parity replies (DF4/5 short, DF20/21 long): CRC remainder = ICAO
+        #    address; accepted only for aircraft heard via DF11/17 in the last minute
+        horizon = self.clock - 60 * RATE
+        for dfs, nb in (((4, 5), 56), ((20, 21), 112)):
+            sel = np.flatnonzero(np.isin(df, dfs))
+            if len(sel):
+                rem = _crc_rem_batch(bits[sel], nb)
+                for k, r in zip(sel, rem):
+                    seen = self.known.get(int(r))
+                    if seen is not None and seen >= horizon:
+                        found.append((q[k], nb, bits[k]))
+        if len(self.known) > 5000:
+            self.known = {a: t for a, t in self.known.items() if t >= horizon}
+        found.sort(key=lambda f: f[0])
+        out, last_end = [], -1
+        for start, nb, b in found:
+            if start < last_end:                      # same message seen at an offset
                 continue
-            last = start
-            out.append(np.packbits(b).tobytes())
+            last_end = start + PREAMBLE + 2 * nb
+            out.append(np.packbits(b[:nb]).tobytes())
         self.messages += len(out)
         return out
 
@@ -118,8 +158,39 @@ def _bits(msg: bytes, a: int, b: int) -> int:
     return (v >> (n - b)) & ((1 << (b - a + 1)) - 1)
 
 
+def df_of(msg: bytes) -> int:
+    return msg[0] >> 3
+
+
 def icao(msg: bytes) -> str:
+    """Address: in the message for DF11/17/18, the CRC remainder for DF4/5/20/21."""
+    if df_of(msg) in (4, 5, 20, 21):
+        return f"{crc24(msg[:-3]) ^ int.from_bytes(msg[-3:], 'big'):06X}"
     return msg[1:4].hex().upper()
+
+
+def ac13_altitude(msg: bytes):
+    """DF4/20 altitude (25 ft steps only; Gillham / metric skipped)."""
+    ac = _bits(msg, 20, 32)
+    if ac == 0 or (ac >> 6) & 1 or not (ac >> 4) & 1:
+        return None
+    n = ((ac & 0x1F80) >> 2) | ((ac & 0x0020) >> 1) | (ac & 0x000F)
+    return n * 25 - 1000
+
+
+def _id13(c: int) -> str:
+    bit = lambda k: (c >> (12 - k)) & 1               # noqa: E731
+    # field order: C1 A1 C2 A2 C4 A4 X B1 D1 B2 D2 B4 D4
+    a = bit(1) | bit(3) << 1 | bit(5) << 2
+    b = bit(7) | bit(9) << 1 | bit(11) << 2
+    cc = bit(0) | bit(2) << 1 | bit(4) << 2
+    d = bit(8) | bit(10) << 1 | bit(12) << 2
+    return f"{a}{b}{cc}{d}"
+
+
+def id13_squawk(msg: bytes) -> str:
+    """DF5/21 identity (squawk)."""
+    return _id13(_bits(msg, 20, 32))
 
 
 def typecode(msg: bytes) -> int:
@@ -203,14 +274,7 @@ def squawk(msg: bytes):
     """Mode A code from an emergency/priority status message (TC 28/1)."""
     if typecode(msg) != 28 or _bits(msg, 38, 40) != 1:
         return None
-    c = _bits(msg, 44, 56)                            # 13-bit identity field
-    bit = lambda k: (c >> (12 - k)) & 1               # noqa: E731
-    # field order: C1 A1 C2 A2 C4 A4 X B1 D1 B2 D2 B4 D4
-    a = bit(1) | bit(3) << 1 | bit(5) << 2
-    b = bit(7) | bit(9) << 1 | bit(11) << 2
-    cc = bit(0) | bit(2) << 1 | bit(4) << 2
-    d = bit(8) | bit(10) << 1 | bit(12) << 2
-    return f"{a}{b}{cc}{d}"
+    return _id13(_bits(msg, 44, 56))               # 13-bit identity field
 
 
 def distance_km(lat1, lon1, lat2, lon2):
@@ -239,10 +303,23 @@ class Tracker:
         if p is None:
             p = self.planes[a] = {"icao": a, "callsign": "", "lat": None, "lon": None,
                                   "alt": None, "gs": None, "track": None, "vrate": None,
-                                  "squawk": None, "rotor": False, "msgs": 0,
+                                  "squawk": None, "rotor": False, "hover": False, "msgs": 0,
+                                  "adsb": False,
                                   "first": t, "last": t, "pos_t": None, "trail": []}
         p["msgs"] += 1
         p["last"] = t
+        df = df_of(msg)
+        if df in (4, 20):
+            alt = ac13_altitude(msg)
+            if alt is not None and not p["adsb"]:
+                p["alt"] = alt
+            return p
+        if df in (5, 21):
+            p["squawk"] = id13_squawk(msg)
+            return p
+        if df == 11:
+            return p
+        p["adsb"] = True
         tc = typecode(msg)
         if 1 <= tc <= 4:
             p["callsign"] = callsign(msg) or p["callsign"]
@@ -267,6 +344,10 @@ class Tracker:
             v = velocity(msg)
             if v:
                 p["gs"], p["track"], p["vrate"] = v
+                # hovering / very slow while clearly airborne: a helicopter
+                if (p["gs"] is not None and p["gs"] < 35 and p["alt"] is not None
+                        and p["alt"] > 400):
+                    p["hover"] = True
         elif tc == 28:
             sq = squawk(msg)
             if sq:

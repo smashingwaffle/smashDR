@@ -8,6 +8,7 @@ PyQt6-WebEngine is installed, a Leaflet map (Esri dark grey canvas, or OSM).
 
 import json
 import queue
+import re
 import time
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -33,6 +34,13 @@ READ_BYTES = 262144                     # 65 ms at 2 MS/s
 DEFAULT_HOME = (34.087, -118.183)       # roughly 90032; set yours on the tab
 KM_PER_MI = 1.609344
 EMERGENCY = {"7500": "HIJACK", "7600": "RADIO FAIL", "7700": "EMERGENCY"}
+# helicopter makers / models as they appear in aircraft-type text
+HELI_RX = re.compile(
+    r"\b(helicopter|rotorcraft|bell|robinson|eurocopter|sikorsky|agusta|leonardo|"
+    r"md helicopters|hughes|schweizer|enstrom|kaman|messerschmitt|mbb|"
+    r"aw ?1[0-9]{2}|a109|a119|as ?3[3-6][0-9]|ec ?1[2-7][0-9]|h1[2-7][05]|bk ?117|bo ?105|"
+    r"r22|r44|r66|s-?76|s-?92|uh-?60|hh-?60|ah-?64|ch-?47|mh-?60|uh-?1)\b", re.I)
+TYPE_CACHE_DAYS = 30
 
 
 # --------------------------------------------------------------------------
@@ -511,6 +519,13 @@ class AircraftTab(QtWidgets.QWidget):
         self._fa_times = []                     # call times (10/min limit)
         self._net = QtNetwork.QNetworkAccessManager(self)
         self.images = Images(self._net)
+        self._type_file = USER / "cache" / "aircraft.json"
+        self._load_types()
+        self._typeq = []                        # ICAOs waiting for a background type lookup
+        self._type_timer = QtCore.QTimer(self)
+        self._type_timer.timeout.connect(self._next_type_lookup)
+        self._type_timer.start(1500)            # gentle on adsbdb: < 1 request / second
+        self._type_dirty = 0
 
         self.dev_box = QtWidgets.QComboBox()
         for i, name in enumerate(devices or ["#0", "#1"]):
@@ -667,6 +682,8 @@ class AircraftTab(QtWidgets.QWidget):
         if self.reader is not None:
             self.reader.stop()
             self.reader.wait(3000)
+        if self._type_dirty:
+            self.save_types()
 
     def _home_changed(self, _v):
         lat, lon = self.lat_box.value(), self.lon_box.value()
@@ -780,7 +797,7 @@ class AircraftTab(QtWidgets.QWidget):
         info = self._info.get(p["icao"])
         if info:
             c.type_lbl.setText(info["text"])
-        elif p["rotor"]:
+        elif self.is_heli(p):
             c.type_lbl.setText("Rotorcraft · ICAO " + p["icao"])
         else:
             c.type_lbl.setText("ICAO " + p["icao"])
@@ -887,15 +904,18 @@ class AircraftTab(QtWidgets.QWidget):
                       lambda d, i=icao: self._got_aircraft(i, d))
         elif self._info[icao] and self._info[icao].get("pixmap") is not None:
             self.card.photo.setPixmap(self._info[icao]["pixmap"])
+        else:
+            self._fetch_photo(icao)
         if cs and self._fa_lookup(cs):
             pass                                  # FlightAware answers the route
         elif cs and cs not in self._routes:
             self._routes[cs] = None
             self._get(f"https://api.adsbdb.com/v0/callsign/{cs}",
                       lambda d, c=cs: self._got_route(c, d))
-        if self._info.get(icao) is None:
+        info = self._info.get(icao)
+        if info is None or info.get("pixmap") is None:
             self.card.photo.setPixmap(QtGui.QPixmap())
-            self.card.photo.setText("no photo")
+            self.card.photo.setText("photo loading…" if info and info.get("photo") else "no photo")
 
     # ---- FlightAware AeroAPI (optional key, monthly cap) -------------------
     def fa_usage(self):
@@ -952,22 +972,67 @@ class AircraftTab(QtWidgets.QWidget):
         if p and p["callsign"] == cs:
             self._update_card()
 
+    # ---- aircraft type: background lookups, disk cache, helicopter check ----
+    def _load_types(self):
+        try:
+            data = json.loads(self._type_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        cutoff = time.time() - TYPE_CACHE_DAYS * 86400
+        for icao, d in data.items() if isinstance(data, dict) else []:
+            if isinstance(d, dict) and d.get("t", 0) > cutoff:
+                self._info[icao] = dict(d, pixmap=None)
+
+    def save_types(self):
+        try:
+            self._type_file.parent.mkdir(parents=True, exist_ok=True)
+            out = {i: {k: v for k, v in d.items() if k != "pixmap"}
+                   for i, d in self._info.items() if d}
+            self._type_file.write_text(json.dumps(out), encoding="utf-8")
+            self._type_dirty = 0
+        except OSError as e:
+            print("[!] Could not save aircraft cache:", e)
+
+    def _next_type_lookup(self):
+        while self._typeq:
+            icao = self._typeq.pop(0)
+            if icao not in self._info and icao in self._planes:
+                self._info[icao] = None
+                self._get(f"https://api.adsbdb.com/v0/aircraft/{icao}",
+                          lambda d, i=icao: self._got_aircraft(i, d))
+                return
+
+    def is_heli(self, p):
+        info = self._info.get(p["icao"])
+        return bool(p["rotor"] or p.get("hover") or (info and info.get("heli")))
+
     def _got_aircraft(self, icao, data):
         a = _field(data, "aircraft")
         if not isinstance(a, dict):
             self._info[icao] = {"text": f"ICAO {icao} · not in the aircraft database",
-                                "pixmap": None}
+                                "pixmap": None, "heli": False, "photo": None, "t": time.time()}
         else:
             bits = [a.get("manufacturer", ""), a.get("type", "")]
             line1 = " ".join(b for b in bits if b).strip() or a.get("icao_type", "")
             line2 = " · ".join(x for x in (a.get("registration"), a.get("registered_owner"),
                                             a.get("registered_owner_country_name")) if x)
-            self._info[icao] = {"text": f"{line1}\n{line2}".strip(), "pixmap": None}
-            url = a.get("url_photo_thumbnail") or a.get("url_photo")
-            if url:
-                self._get(url, lambda d, i=icao: self._got_photo(i, d))
+            heli = bool(HELI_RX.search(" ".join(str(a.get(k, "")) for k in
+                                                ("manufacturer", "type", "icao_type"))))
+            self._info[icao] = {"text": f"{line1}\n{line2}".strip(), "pixmap": None,
+                                "heli": heli, "t": time.time(),
+                                "photo": a.get("url_photo_thumbnail") or a.get("url_photo")}
+        self._type_dirty += 1
+        if self._type_dirty >= 20:
+            self.save_types()
         if icao == self._selected:
+            self._fetch_photo(icao)
             self._update_card()
+
+    def _fetch_photo(self, icao):
+        info = self._info.get(icao)
+        if info and info.get("photo") and info.get("pixmap") is None and not info.get("photo_req"):
+            info["photo_req"] = True
+            self._get(info["photo"], lambda d, i=icao: self._got_photo(i, d))
 
     def _got_photo(self, icao, data):
         if not data:
@@ -1001,10 +1066,14 @@ class AircraftTab(QtWidgets.QWidget):
         code, name, _num = airlines.split(p["callsign"])
         _iso, cname = country(p["icao"])
         bits = [p["callsign"], p["icao"], p["squawk"], name, code, cname]
-        if p["rotor"]:
+        if self.is_heli(p):
             bits += ["helicopter", "heli", "rotor"]
         if not name and p["callsign"]:
             bits += ["private"]
+        if not p.get("adsb", True):
+            bits += ["transponder", "mode s", "no position"]
+        if self.is_heli(p):
+            bits += ["helicopter", "heli"]
         seen = airports.infer(p)
         if seen:
             bits += [seen[1], seen[2], "arriving" if seen[0] == "arr" else "departed"]
@@ -1045,12 +1114,15 @@ class AircraftTab(QtWidgets.QWidget):
         if HAVE_WEB and self._map_ready:
             js = [{"icao": p["icao"], "flight": p["callsign"] or "", "lat": p["lat"],
                    "lon": p["lon"], "alt": p["alt"], "track": p["track"],
-                   "rotor": p["rotor"], "emergency": p["squawk"] in EMERGENCY,
+                   "rotor": self.is_heli(p), "emergency": p["squawk"] in EMERGENCY,
                    "trail": p["trail"]} for p in shown]
             self._js(f"update({json.dumps(js)})")
 
     def _on_snapshot(self, planes, stats):
         self._planes = {p["icao"]: p for p in planes}
+        for p in planes:                       # learn types in the background (helicopters)
+            if p["icao"] not in self._info and p["icao"] not in self._typeq:
+                self._typeq.append(p["icao"])
         with_pos = sum(1 for p in planes if p["lat"] is not None)
         self.stat_lbl.setText(f"{len(planes)} aircraft ({with_pos} with position)  ·  "
                               f"{stats['msgs_per_s']:.0f} msg/s  ·  {stats['total']} total"
@@ -1074,7 +1146,9 @@ class AircraftTab(QtWidgets.QWidget):
             if code:
                 flight.setIcon(QtGui.QIcon(self.images.airline_icon(code, 40)))
             airline = QtWidgets.QTableWidgetItem(
-                name or ("Helicopter" if p["rotor"] else ("Private / other" if p["callsign"] else "")))
+                name or ("Helicopter" if self.is_heli(p) else
+                         ("Private / other" if p["callsign"] else
+                          ("" if p.get("adsb", True) else "Transponder only (no position)"))))
             airline.setForeground(QtGui.QColor("#cfd8dc" if name else "#8a9399"))
             iso, cname = country(p["icao"])
             fl = self.images.flag(iso)
