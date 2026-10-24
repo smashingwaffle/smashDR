@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -929,8 +929,25 @@ class MainWindow(QtWidgets.QMainWindow):
         sf.addRow("Model", self.stt_box)
         sf.addRow("", stt_note)
 
+        # --- Maps ---
+        self.carto_edit = QtWidgets.QLineEdit(str(opts.get("carto_key", "")))
+        self.carto_edit.setPlaceholderText("paste your free CARTO basemaps key")
+        self.carto_edit.setClearButtonEnabled(True)
+        self.carto_edit.editingFinished.connect(self._set_carto_key)
+        carto_note = QtWidgets.QLabel(
+            "Optional. Free for personal use (5M tiles/month): request one at "
+            "<a href='https://carto.com/basemaps/apikey/'>carto.com/basemaps/apikey</a>. "
+            "Empty = Esri dark grey map, no key needed.")
+        carto_note.setOpenExternalLinks(True)
+        carto_note.setWordWrap(True)
+        carto_note.setStyleSheet("color: gray;")
+        maps = QtWidgets.QGroupBox("Maps")
+        mf = QtWidgets.QFormLayout(maps)
+        mf.addRow("CARTO key", self.carto_edit)
+        mf.addRow("", carto_note)
+
         lay = QtWidgets.QVBoxLayout()
-        for g in (radio, audio_box, display, recording, stt):
+        for g in (radio, audio_box, display, recording, stt, maps):
             lay.addWidget(g)
         lay.addStretch(1)
         inner = QtWidgets.QWidget()
@@ -1031,6 +1048,13 @@ class MainWindow(QtWidgets.QMainWindow):
     # ======================================================================
     # P25 call readout
     # ======================================================================
+    def _set_carto_key(self):
+        key = self.carto_edit.text().strip()
+        if key != str(self.opts.get("carto_key", "")):
+            self.opts["carto_key"] = key
+            self.aircraft_tab.reload_map()
+            self.status_lbl.setText("Map key " + ("saved, map reloaded" if key else "cleared"))
+
     def _set_stt_model(self, _i):
         name = self.stt_box.currentData()
         if self.reader.transcriber is not None:

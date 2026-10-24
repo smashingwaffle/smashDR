@@ -117,15 +117,25 @@ html,body,#map{height:100%;margin:0;background:#1e1e1e}
 </style></head><body><div id="map"></div><script>
 var map = L.map('map', {zoomControl:true}).setView([__LAT__, __LON__], 9);
 var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+var cartoKey = __CARTO_KEY__;
 var dark = L.layerGroup([
   L.tileLayer(esri + 'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {maxZoom: 16,
     attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'}),
   L.tileLayer(esri + 'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {maxZoom: 16})
-]).addTo(map);
+]);
 var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19,
   className: 'osm-dark', attribution: '&copy; OpenStreetMap contributors'});
-L.control.layers({'Dark (Esri)': dark, 'OpenStreetMap': osm}, null,
-  {position: 'topright'}).addTo(map);
+var layers = {'Dark (Esri)': dark, 'OpenStreetMap': osm};
+if (cartoKey) {
+  var carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key='
+      + encodeURIComponent(cartoKey), {subdomains: 'abcd', maxNativeZoom: 18, maxZoom: 20,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'});
+  layers = Object.assign({'Dark (CARTO)': carto}, layers);
+  carto.addTo(map);
+} else {
+  dark.addTo(map);
+}
+L.control.layers(layers, null, {position: 'topright'}).addTo(map);
 var home = L.circleMarker([__LAT__, __LON__], {radius:5, color:'#ffd54f', weight:2,
   fillOpacity:0.6}).addTo(map).bindTooltip('home');
 [50, 100, 150].forEach(function(mi){ L.circle([__LAT__, __LON__], {radius: mi*1609.344,
@@ -251,10 +261,8 @@ class AircraftTab(QtWidgets.QWidget):
 
         if HAVE_WEB:
             self.map = QWebEngineView()
-            lat, lon = self.lat_box.value(), self.lon_box.value()
-            html = MAP_HTML.replace("__LAT__", f"{lat:.5f}").replace("__LON__", f"{lon:.5f}")
             self.map.loadFinished.connect(self._map_loaded)
-            self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/"))
+            self.reload_map()
         else:
             self.map = QtWidgets.QLabel(
                 "Map needs PyQt6-WebEngine.\n\nIn the VSCode terminal run:\n"
@@ -316,6 +324,16 @@ class AircraftTab(QtWidgets.QWidget):
         self.opts["home_lat"], self.opts["home_lon"] = lat, lon
         if self.reader is not None:
             self.reader.set_home(lat, lon)
+
+    def reload_map(self):
+        """(Re)build the map page, e.g. after the CARTO key changed in Settings."""
+        if not HAVE_WEB:
+            return
+        self._map_ready = False
+        lat, lon = self.lat_box.value(), self.lon_box.value()
+        html = (MAP_HTML.replace("__LAT__", f"{lat:.5f}").replace("__LON__", f"{lon:.5f}")
+                .replace("__CARTO_KEY__", json.dumps(str(self.opts.get("carto_key", "")).strip())))
+        self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/"))
 
     def _map_loaded(self, ok):
         self._map_ready = bool(ok)
