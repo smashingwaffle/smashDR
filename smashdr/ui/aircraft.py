@@ -3,7 +3,7 @@ aircraft.py - the Aircraft tab: ADS-B from a second RTL-SDR (1090 MHz).
 
 AdsbReader (QThread) owns its own dongle, demodulates and tracks; once a
 second it emits a snapshot. AircraftTab shows a sortable table and, when
-PyQt6-WebEngine is installed, a Leaflet map (CARTO dark tiles, OSM data).
+PyQt6-WebEngine is installed, a Leaflet map (Esri dark grey canvas, or OSM).
 """
 
 import json
@@ -113,11 +113,19 @@ html,body,#map{height:100%;margin:0;background:#1e1e1e}
 .pl{font:11px Consolas,monospace;color:#e0e0e0;background:rgba(20,20,20,.75);
     border:none;box-shadow:none;padding:1px 4px}
 .pl:before{display:none}
+.osm-dark{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9)}
 </style></head><body><div id="map"></div><script>
 var map = L.map('map', {zoomControl:true}).setView([__LAT__, __LON__], 9);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  maxZoom: 18, subdomains: 'abcd',
-  attribution: '&copy; OpenStreetMap contributors &copy; CARTO'}).addTo(map);
+var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+var dark = L.layerGroup([
+  L.tileLayer(esri + 'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {maxZoom: 16,
+    attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'}),
+  L.tileLayer(esri + 'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {maxZoom: 16})
+]).addTo(map);
+var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19,
+  className: 'osm-dark', attribution: '&copy; OpenStreetMap contributors'});
+L.control.layers({'Dark (Esri)': dark, 'OpenStreetMap': osm}, null,
+  {position: 'topright'}).addTo(map);
 var home = L.circleMarker([__LAT__, __LON__], {radius:5, color:'#ffd54f', weight:2,
   fillOpacity:0.6}).addTo(map).bindTooltip('home');
 [50, 100, 150].forEach(function(mi){ L.circle([__LAT__, __LON__], {radius: mi*1609.344,
