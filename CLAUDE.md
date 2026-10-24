@@ -100,6 +100,10 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   Optional FlightAware AeroAPI key (Settings > Maps and flight info,
   `core/flightaware.py`): /flights/{callsign} on click only, cached per day,
   monthly cap (default 900, counter in settings), 10/min; else adsbdb.
+  Flags: country of registration from the ICAO address block
+  (`core/icao_country.py`), images from flagcdn cached in user/cache/flags.
+  Airline logos: only user-supplied files in user/logos/<ICAO code>.png
+  (never drawn or bundled by us).
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 

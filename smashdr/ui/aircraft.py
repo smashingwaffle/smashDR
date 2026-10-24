@@ -13,6 +13,8 @@ import time
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from smashdr.core import airlines, airports, flightaware
+from smashdr.core.icao_country import country
+from smashdr.paths import USER
 from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import cu8_to_iq
 from smashdr.decoders import adsb
@@ -278,6 +280,72 @@ def flight_name(callsign: str):
     return callsign or "", code
 
 
+class Images:
+    """Country flags (flagcdn.com, cached in user/cache/flags) and your own airline
+    logos (user/logos/<ICAO code>.png, e.g. AAL.png)."""
+
+    FLAG_URL = "https://flagcdn.com/w40/{}.png"
+
+    def __init__(self, net):
+        self.net = net
+        self.flag_dir = USER / "cache" / "flags"
+        self.logo_dir = USER / "logos"
+        for d in (self.flag_dir, self.logo_dir):
+            try:
+                d.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+        self._flags = {}                      # iso -> QPixmap, or None while loading
+        self._logos = {}                      # code -> QPixmap or None (not there)
+
+    def flag(self, iso):
+        if not iso:
+            return None
+        if iso in self._flags:
+            return self._flags[iso]
+        self._flags[iso] = None
+        f = self.flag_dir / f"{iso}.png"
+        pm = QtGui.QPixmap(str(f)) if f.exists() else QtGui.QPixmap()
+        if not pm.isNull():
+            self._flags[iso] = pm
+            return pm
+        reply = self.net.get(QtNetwork.QNetworkRequest(QtCore.QUrl(self.FLAG_URL.format(iso))))
+        reply.finished.connect(lambda r=reply, i=iso: self._got_flag(r, i))
+        return None
+
+    def _got_flag(self, reply, iso):
+        try:
+            if reply.error() == QtNetwork.QNetworkReply.NetworkError.NoError:
+                data = bytes(reply.readAll())
+                pm = QtGui.QPixmap()
+                if pm.loadFromData(data):
+                    self._flags[iso] = pm
+                    try:
+                        (self.flag_dir / f"{iso}.png").write_bytes(data)
+                    except OSError:
+                        pass
+        finally:
+            reply.deleteLater()
+
+    def logo(self, code):
+        if not code:
+            return None
+        if code not in self._logos:
+            pm = None
+            for ext in ("png", "svg", "jpg"):
+                f = self.logo_dir / f"{code}.{ext}"
+                if f.exists():
+                    q = QtGui.QPixmap(str(f))
+                    if not q.isNull():
+                        pm = q
+                        break
+            self._logos[code] = pm
+        return self._logos[code]
+
+    def reload_logos(self):
+        self._logos.clear()
+
+
 class InfoCard(QtWidgets.QFrame):
     """Selected aircraft: photo, flight, route, type/registration, live numbers."""
 
@@ -301,6 +369,7 @@ class InfoCard(QtWidgets.QFrame):
         self.badge.setObjectName("badge")
         self.flight = QtWidgets.QLabel()
         self.flight.setObjectName("flight")
+        self.flag = QtWidgets.QLabel()
         self.route = QtWidgets.QLabel()
         self.route.setObjectName("route")
         self.route.setWordWrap(True)
@@ -315,6 +384,7 @@ class InfoCard(QtWidgets.QFrame):
         top = QtWidgets.QHBoxLayout()
         top.addWidget(self.badge)
         top.addWidget(self.flight)
+        top.addWidget(self.flag)
         top.addStretch(1)
         text = QtWidgets.QVBoxLayout()
         text.addLayout(top)
@@ -330,6 +400,7 @@ class InfoCard(QtWidgets.QFrame):
 
     def clear(self):
         self.badge.hide()
+        self.flag.clear()
         self.flight.setText("No aircraft selected")
         self.route.setText("Click a plane on the map or a row in the list.")
         self.type_lbl.setText("")
@@ -352,6 +423,7 @@ class AircraftTab(QtWidgets.QWidget):
         self._fa = {}                           # callsign -> (day, AeroAPI summary or "none"/None)
         self._fa_times = []                     # call times (10/min limit)
         self._net = QtNetwork.QNetworkAccessManager(self)
+        self.images = Images(self._net)
 
         self.dev_box = QtWidgets.QComboBox()
         for i, name in enumerate(devices or ["#0", "#1"]):
@@ -403,6 +475,7 @@ class AircraftTab(QtWidgets.QWidget):
         self.table.sortByColumn(col, order)
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(30)
+        self.table.setIconSize(QtCore.QSize(24, 16))
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -584,12 +657,26 @@ class AircraftTab(QtWidgets.QWidget):
         name, code = flight_name(p["callsign"])
         c = self.card
         if code:
-            c.badge.setText(code)
-            c.badge.setStyleSheet(f"background:{airlines.badge_color(code)};")
+            logo = self.images.logo(code)
+            if logo is not None:
+                c.badge.setText("")
+                c.badge.setPixmap(logo.scaledToHeight(36, QtCore.Qt.TransformationMode.SmoothTransformation))
+                c.badge.setStyleSheet("background: transparent; padding: 0;")
+            else:
+                c.badge.setPixmap(QtGui.QPixmap())
+                c.badge.setText(code)
+                c.badge.setStyleSheet(f"background:{airlines.badge_color(code)};")
             c.badge.show()
         else:
             c.badge.hide()
         c.flight.setText(name or p["icao"])
+        iso, cname = country(p["icao"])
+        fl = self.images.flag(iso)
+        if fl is not None:
+            c.flag.setPixmap(fl.scaledToHeight(20, QtCore.Qt.TransformationMode.SmoothTransformation))
+            c.flag.setToolTip(f"Registered in {cname}")
+        else:
+            c.flag.clear()
         c.route.setText(self._route_html(p, lookup))
         info = self._info.get(p["icao"])
         if info:
@@ -847,6 +934,15 @@ class AircraftTab(QtWidgets.QWidget):
             airline = QtWidgets.QTableWidgetItem(
                 name or ("Helicopter" if p["rotor"] else ("Private / other" if p["callsign"] else "")))
             airline.setForeground(QtGui.QColor("#cfd8dc" if name else "#8a9399"))
+            iso, cname = country(p["icao"])
+            fl = self.images.flag(iso)
+            if fl is not None:
+                airline.setIcon(QtGui.QIcon(fl))
+                airline.setToolTip(f"Registered in {cname}")
+            logo = self.images.logo(code)
+            if logo is not None:
+                flight.setIcon(QtGui.QIcon(logo))
+                flight.setBackground(QtGui.QColor(0, 0, 0, 0))
             alt = _Num(f"{p['alt']:,}" if p["alt"] is not None else "", p["alt"])
             alt.setForeground(QtGui.QColor(airlines.alt_color(p["alt"])))
             hdg = _Num(f"{ARROWS[int((p['track'] + 22.5) % 360 // 45)]} {p['track']:.0f}°"
