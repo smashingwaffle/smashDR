@@ -30,8 +30,20 @@ STORE = HERE / "presets.json"
 DEFAULT_STORE = HERE / "presets_default.json"
 MODE_NAMES = ["NFM", "AM", "WFM"]
 # preset button sizes: (width, height, font pt)
-BUTTON_SIZES = {"Small": (132, 46, 9), "Medium": (170, 58, 10), "Large": (210, 70, 12)}
+BUTTON_SIZES = {"Small": (140, 50, 9), "Medium": (180, 60, 10), "Large": (220, 72, 12)}
 DEFAULT_BUTTON_SIZE = "Large"
+PINNED = "__pinned__"        # key of the virtual Pinned section
+PINNED_COLOR = "#ef9f27"
+GROUP_PALETTE = [("Red", "#e24b4a"), ("Purple", "#7f77dd"), ("Green", "#1d9e75"),
+                 ("Blue", "#378add"), ("Amber", "#ef9f27"), ("Pink", "#d4537e"),
+                 ("Teal", "#2bb3c0"), ("Coral", "#d85a30"), ("Lime", "#7cb342"),
+                 ("Gray", "#888780")]
+# first match wins: group name (lower case) contains the keyword -> colour
+GROUP_HINTS = (("fire", "#e24b4a"), ("lafd", "#e24b4a"), ("ems", "#e24b4a"),
+               ("p25", "#7f77dd"), ("lapd", "#7f77dd"), ("police", "#7f77dd"),
+               ("sheriff", "#7f77dd"), ("wilson", "#1d9e75"), ("repeater", "#1d9e75"),
+               ("ham", "#d4537e"), ("air", "#378add"), ("weather", "#888780"),
+               ("noaa", "#888780"), ("marine", "#2bb3c0"), ("fm", "#ef9f27"))
 STEP_CHOICES = [0, 1000, 2500, 5000, 6250, 7500, 8330, 10000, 12500, 15000,
                 20000, 25000, 50000, 100000, 200000]
 
@@ -59,6 +71,8 @@ def _clean(p: dict):
         out["note"] = str(p["note"])
     if p.get("digital"):
         out["digital"] = str(p["digital"])
+    if p.get("pinned"):
+        out["pinned"] = True
     return out
 
 
@@ -81,19 +95,21 @@ def _read(path: Path):
             "collapsed": [str(g) for g in data.get("collapsed", [])],
             "defaults_seen": [str(k) for k in data.get("defaults_seen", [])],
             "button_size": size if size in BUTTON_SIZES else DEFAULT_BUTTON_SIZE,
-            "groups": [str(g) for g in data.get("groups", []) if str(g).strip()]}
+            "groups": [str(g) for g in data.get("groups", []) if str(g).strip()],
+            "group_colors": {str(k): str(v) for k, v in (data.get("group_colors") or {}).items()
+                             if QtGui.QColor(str(v)).isValid()}}
 
 
 def load_store() -> dict:
     """User presets merged with any defaults they haven't seen yet."""
     defaults = _read(DEFAULT_STORE) or {"presets": [], "collapsed": [], "defaults_seen": [],
-                                        "button_size": DEFAULT_BUTTON_SIZE, "groups": []}
+                                        "button_size": DEFAULT_BUTTON_SIZE, "groups": [], "group_colors": {}}
     user = _read(STORE)
     if user is None:
         return {"presets": list(defaults["presets"]),
                 "collapsed": list(defaults["collapsed"]),
                 "defaults_seen": [preset_key(p) for p in defaults["presets"]],
-                "button_size": DEFAULT_BUTTON_SIZE, "groups": []}
+                "button_size": DEFAULT_BUTTON_SIZE, "groups": [], "group_colors": {}}
     seen = set(user["defaults_seen"]) or {preset_key(p) for p in user["presets"]}
     have = {preset_key(p) for p in user["presets"]}
     new_groups = []
@@ -235,6 +251,46 @@ def groups_in_order(presets: list, order: list = ()) -> list:
         if p["group"] not in seen:
             seen.append(p["group"])
     return seen
+
+
+def auto_group_color(group: str, index: int) -> str:
+    g = group.lower()
+    for key, col in GROUP_HINTS:
+        if key in g:
+            return col
+    return GROUP_PALETTE[index % len(GROUP_PALETTE)][1]
+
+
+def _rgba(hex_color: str, alpha: float) -> str:
+    c = QtGui.QColor(hex_color)
+    return f"rgba({c.red()}, {c.green()}, {c.blue()}, {int(alpha * 255)})"
+
+
+def _lighter(hex_color: str, amount: float = 0.45) -> str:
+    """Mix towards white (readable accent text on a dark background)."""
+    c = QtGui.QColor(hex_color)
+    mix = [int(v + (255 - v) * amount) for v in (c.red(), c.green(), c.blue())]
+    return "#%02x%02x%02x" % tuple(mix)
+
+
+def _solid(hex_color: str, alpha: float, base: str = "#262626") -> str:
+    """hex_color at alpha over a dark base, as an opaque #rrggbb (for rich text)."""
+    c, b = QtGui.QColor(hex_color), QtGui.QColor(base)
+    mix = [int(bv + (cv - bv) * alpha) for cv, bv in ((c.red(), b.red()), (c.green(), b.green()),
+                                                      (c.blue(), b.blue()))]
+    return "#%02x%02x%02x" % tuple(mix)
+
+
+def dot_icon(hex_color: str, size: int = 12) -> QtGui.QIcon:
+    pm = QtGui.QPixmap(size, size)
+    pm.fill(QtCore.Qt.GlobalColor.transparent)
+    qp = QtGui.QPainter(pm)
+    qp.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+    qp.setBrush(QtGui.QColor(hex_color))
+    qp.setPen(QtCore.Qt.PenStyle.NoPen)
+    qp.drawEllipse(1, 1, size - 2, size - 2)
+    qp.end()
+    return QtGui.QIcon(pm)
 
 
 def preset_subtitle(p: dict) -> str:
@@ -434,23 +490,68 @@ class ImportDialog(QtWidgets.QDialog):
 # Presets window
 # --------------------------------------------------------------------------
 class PresetButton(QtWidgets.QPushButton):
-    def __init__(self, preset: dict, size: str = DEFAULT_BUTTON_SIZE, parent=None):
+    """Name on top, frequency + mode badge underneath, tinted with its group colour."""
+
+    def __init__(self, preset: dict, size: str = DEFAULT_BUTTON_SIZE, color: str = "#888780",
+                 section: str = "", parent=None):
         super().__init__(parent)
         self.preset = preset
+        self.section = section              # the section this button sits in (group or PINNED)
+        self.color = color
+        self._live = False
+        self.setObjectName("pb")
         self.setCheckable(True)
         w, h, pt = BUTTON_SIZES.get(size, BUTTON_SIZES[DEFAULT_BUTTON_SIZE])
         self.setFixedSize(w, h)
+        self.name_lbl = QtWidgets.QLabel(preset["name"])
+        self.name_lbl.setObjectName("nm")
         f = self.font()
         f.setPointSize(pt)
-        self.setFont(f)
-        self.setText(f"{preset['name']}\n{preset_subtitle(preset)}")
-        if preset.get("digital"):
-            self.setProperty("digital", "true")
-        tip = f"{preset['name']}  ·  {preset_subtitle(preset)}"
+        f.setBold(True)
+        self.name_lbl.setFont(f)
+        self.sub_lbl = QtWidgets.QLabel()
+        self.sub_lbl.setObjectName("sub")
+        self.sub_lbl.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        f2 = self.font()
+        f2.setPointSize(max(8, pt - 2))
+        self.sub_lbl.setFont(f2)
+        for lbl in (self.name_lbl, self.sub_lbl):
+            lbl.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(10, 4, 8, 4)
+        lay.setSpacing(1)
+        lay.addWidget(self.name_lbl)
+        lay.addWidget(self.sub_lbl)
+        tip = f"{preset['name']}  ·  {preset_subtitle(preset)}  ·  {preset['group']}"
         if preset.get("note"):
             tip += f"\n{preset['note']}"
         self.setToolTip(tip)
         self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        c = color
+        self.setStyleSheet(f"""
+            QPushButton#pb {{ background: {_rgba(c, 0.16)}; border: 1px solid {_rgba(c, 0.55)};
+                              border-radius: 6px; }}
+            QPushButton#pb:hover {{ background: {_rgba(c, 0.30)}; }}
+            QPushButton#pb:checked {{ background: {_rgba(c, 0.42)}; border: 2px solid {_lighter(c, 0.3)}; }}
+            QLabel#nm {{ background: transparent; color: #f2f2f2; }}
+            QLabel#sub {{ background: transparent; color: {_lighter(c)}; }}
+        """)
+        self._update_sub()
+
+    def set_live(self, live: bool):
+        if live != self._live:
+            self._live = live
+            self._update_sub()
+
+    def _update_sub(self):
+        p = self.preset
+        badge = p.get("digital") or p["mode"]
+        bc = "#7f77dd" if p.get("digital") else self.color
+        html = (f"<span style='font-family:Consolas,monospace'>{p['freq_hz'] / 1e6:.4f}</span>"
+                f"&nbsp; <span style='background-color:{_solid(bc, 0.75)}; color:#ffffff'>&nbsp;{badge}&nbsp;</span>")
+        if self._live:
+            html += "&nbsp; <span style='color:#5ee08a'>● live</span>"
+        self.sub_lbl.setText(html)
 
 
 class PresetsWindow(QtWidgets.QWidget):
@@ -460,17 +561,15 @@ class PresetsWindow(QtWidgets.QWidget):
     presets_changed = QtCore.pyqtSignal(list)
 
     STYLE = """
-        QPushButton { text-align: left; padding: 3px 8px; }
-        QPushButton:checked { background: palette(highlight); color: palette(highlighted-text); }
-        QToolButton#groupHeader { border: none; text-align: left; padding: 4px 2px; }
-        QPushButton[digital="true"] { border-left: 4px solid #8e7cc3; }
+        QListWidget#groupList { border: none; font-size: 11pt; }
+        QListWidget#groupList::item { padding: 6px 4px; }
     """
 
     def __init__(self, get_current, parent=None):
         """get_current() -> dict with freq_hz, mode, step_hz, squelch_db of the receiver."""
         super().__init__(parent, QtCore.Qt.WindowType.Window)
         self.setWindowTitle("smashDR presets")
-        self.resize(1000, 900)
+        self.resize(1900, 1040)
         self.get_current = get_current
         store = load_store()
         self.presets = store["presets"]
@@ -478,6 +577,8 @@ class PresetsWindow(QtWidgets.QWidget):
         self.defaults_seen = store["defaults_seen"]
         self.button_size = store["button_size"]
         self.group_order = list(store.get("groups", []))      # all groups, may include empty ones
+        self.group_colors = dict(store.get("group_colors", {}))
+        self._live_freq = None
         self._buttons = []
         self._sections = {}           # group -> (header button, holder widget)
         self._active = None          # (freq_hz, mode)
@@ -521,63 +622,105 @@ class PresetsWindow(QtWidgets.QWidget):
         self.body = QtWidgets.QWidget()
         self.body_lay = QtWidgets.QVBoxLayout(self.body)
         self.body_lay.setContentsMargins(4, 4, 4, 4)
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(self.body)
+        self.scroll = QtWidgets.QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setWidget(self.body)
 
-        lay = QtWidgets.QVBoxLayout(self)
-        lay.addLayout(bar)
-        lay.addLayout(bar2)
-        lay.addWidget(scroll, 1)
+        # group list on the left: click = jump to that group
+        self.group_list = QtWidgets.QListWidget()
+        self.group_list.setObjectName("groupList")
+        self.group_list.setFixedWidth(230)
+        self.group_list.setIconSize(QtCore.QSize(12, 12))
+        self.group_list.itemClicked.connect(self._jump_to)
+
+        right = QtWidgets.QWidget()
+        rl = QtWidgets.QVBoxLayout(right)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.addLayout(bar)
+        rl.addLayout(bar2)
+        rl.addWidget(self.scroll, 1)
+        side = QtWidgets.QWidget()
+        sl = QtWidgets.QVBoxLayout(side)
+        sl.setContentsMargins(0, 0, 0, 0)
+        cap = QtWidgets.QLabel("Groups")
+        cap.setStyleSheet("color: gray; padding: 4px;")
+        sl.addWidget(cap)
+        sl.addWidget(self.group_list, 1)
+
+        lay = QtWidgets.QHBoxLayout(self)
+        lay.addWidget(side)
+        lay.addWidget(right, 1)
         self.setStyleSheet(self.STYLE)
         self.rebuild()
 
     # ---- building ----
+    def color_of(self, group: str) -> str:
+        if group == PINNED:
+            return PINNED_COLOR
+        if group not in self.group_colors:
+            groups = self.groups()
+            self.group_colors[group] = auto_group_color(
+                group, groups.index(group) if group in groups else len(groups))
+        return self.group_colors[group]
+
+    def _make_section(self, key, title, presets):
+        color = self.color_of(key)
+        hdr = QtWidgets.QToolButton()
+        hdr.setObjectName("groupHeader")
+        hdr.setText(f"{title}   {len(presets)}")
+        hdr.setCheckable(True)
+        hdr.setChecked(key not in self.collapsed)
+        hdr.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        hdr.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding,
+                          QtWidgets.QSizePolicy.Policy.Fixed)
+        f = hdr.font()
+        f.setBold(True)
+        f.setPointSize(f.pointSize() + 2)
+        hdr.setFont(f)
+        hdr.setStyleSheet(f"QToolButton#groupHeader {{ border: none; border-left: 5px solid {color};"
+                          f" background: {_rgba(color, 0.10)}; text-align: left;"
+                          f" padding: 5px 8px; margin-top: 8px; }}")
+        if key != PINNED:
+            hdr.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+            hdr.customContextMenuRequested.connect(
+                lambda pos, g=key, h=hdr: self._group_menu(g, h, pos))
+            hdr.setToolTip("Click to collapse / expand, right-click for colour, rename, move, delete")
+        holder = QtWidgets.QWidget()
+        flow = FlowLayout(holder)
+        if not presets:
+            hint = QtWidgets.QLabel("Empty group: right-click a preset > Move to group, "
+                                    "or Add current")
+            hint.setStyleSheet("color: gray; padding: 4px;")
+            flow.addWidget(hint)
+        for p in presets:
+            b = PresetButton(p, self.button_size, self.color_of(p["group"]), section=key)
+            b.clicked.connect(lambda _c, pp=p: self._clicked(pp))
+            b.customContextMenuRequested.connect(
+                lambda pos, btn=b: self._context_menu(btn, pos))
+            flow.addWidget(b)
+            self._buttons.append(b)
+        self.body_lay.addWidget(hdr)
+        self.body_lay.addWidget(holder)
+        self._sections[key] = (hdr, holder)
+        self._style_section(key)
+        hdr.toggled.connect(lambda on, g=key: self._toggle_group(g, on))
+        item = QtWidgets.QListWidgetItem(dot_icon(color), f"{title}   ({len(presets)})")
+        item.setData(QtCore.Qt.ItemDataRole.UserRole, key)
+        self.group_list.addItem(item)
+
     def rebuild(self):
         while self.body_lay.count():
             it = self.body_lay.takeAt(0)
             if it.widget():
                 it.widget().deleteLater()
+        self.group_list.clear()
         self._buttons = []
         self._sections = {}
+        pinned = [p for p in self.presets if p.get("pinned")]
+        if pinned:
+            self._make_section(PINNED, "Pinned", pinned)
         for group in self.groups():
-            n = sum(1 for p in self.presets if p["group"] == group)
-            hdr = QtWidgets.QToolButton()
-            hdr.setObjectName("groupHeader")
-            hdr.setText(f"{group}  ({n})")
-            hdr.setCheckable(True)
-            hdr.setChecked(group not in self.collapsed)
-            hdr.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-            hdr.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding,
-                              QtWidgets.QSizePolicy.Policy.Fixed)
-            f = hdr.font()
-            f.setBold(True)
-            hdr.setFont(f)
-            hdr.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
-            hdr.customContextMenuRequested.connect(
-                lambda pos, g=group, h=hdr: self._group_menu(g, h, pos))
-            hdr.setToolTip("Click to collapse / expand, right-click to rename, move or delete")
-            holder = QtWidgets.QWidget()
-            flow = FlowLayout(holder)
-            if n == 0:
-                hint = QtWidgets.QLabel("Empty group: right-click a preset > Move to group, "
-                                        "or Add current")
-                hint.setStyleSheet("color: gray; padding: 4px;")
-                flow.addWidget(hint)
-            for p in self.presets:
-                if p["group"] != group:
-                    continue
-                b = PresetButton(p, self.button_size)
-                b.clicked.connect(lambda _c, pp=p: self._clicked(pp))
-                b.customContextMenuRequested.connect(
-                    lambda pos, btn=b: self._context_menu(btn, pos))
-                flow.addWidget(b)
-                self._buttons.append(b)
-            self.body_lay.addWidget(hdr)
-            self.body_lay.addWidget(holder)
-            self._sections[group] = (hdr, holder)
-            self._style_section(group)
-            hdr.toggled.connect(lambda on, g=group: self._toggle_group(g, on))
+            self._make_section(group, group, [p for p in self.presets if p["group"] == group])
         if not self.presets:
             empty = QtWidgets.QLabel("No presets yet. Tune somewhere and click Add current.")
             empty.setWordWrap(True)
@@ -585,6 +728,15 @@ class PresetsWindow(QtWidgets.QWidget):
         self.body_lay.addStretch(1)
         self._apply_filter(self.filter.text())
         self._refresh_active()
+
+    def _jump_to(self, item):
+        key = item.data(QtCore.Qt.ItemDataRole.UserRole)
+        if key not in self._sections:
+            return
+        hdr, _holder = self._sections[key]
+        if not hdr.isChecked():
+            hdr.setChecked(True)                     # expands (and saves) via toggled
+        QtCore.QTimer.singleShot(0, lambda: self.scroll.verticalScrollBar().setValue(hdr.y()))
 
     def _set_button_size(self, size):
         self.button_size = size
@@ -625,7 +777,7 @@ class PresetsWindow(QtWidgets.QWidget):
             b.setVisible(vis)
             shown += vis
         for g, (hdr, holder) in self._sections.items():
-            any_vis = any(b.preset["group"] == g and (not t or b.isVisibleTo(holder))
+            any_vis = any(b.section == g and (not t or b.isVisibleTo(holder))
                           for b in self._buttons)
             hdr.setVisible(any_vis or not t)
             self._style_section(g)
@@ -639,6 +791,12 @@ class PresetsWindow(QtWidgets.QWidget):
     def _refresh_active(self):
         for b in self._buttons:
             b.setChecked(self._active is not None and b.preset["freq_hz"] == self._active[0])
+            b.set_live(self._live_freq is not None and b.preset["freq_hz"] == self._live_freq)
+
+    def set_live(self, freq_hz):
+        """Mark the preset(s) on freq_hz as having a call in progress (None = no call)."""
+        self._live_freq = None if freq_hz is None else int(freq_hz)
+        self._refresh_active()
 
     # ---- actions ----
     def _clicked(self, p):
@@ -651,7 +809,9 @@ class PresetsWindow(QtWidgets.QWidget):
             save_store({"presets": self.presets, "collapsed": sorted(self.collapsed),
                         "defaults_seen": self.defaults_seen,
                         "button_size": self.button_size,
-                        "groups": self.group_order})
+                        "groups": self.group_order,
+                        "group_colors": {g: c for g, c in self.group_colors.items()
+                                         if g in self.group_order}})
         except OSError as e:
             QtWidgets.QMessageBox.warning(self, "Presets", f"Couldn't save presets: {e}")
         self.presets_changed.emit(list(self.presets))
@@ -691,6 +851,7 @@ class PresetsWindow(QtWidgets.QWidget):
         a_edit = menu.addAction("Edit…")
         a_dup = menu.addAction("Duplicate")
         a_upd = menu.addAction("Update to current frequency")
+        a_pin = menu.addAction("Unpin" if p.get("pinned") else "Pin to top")
         move = menu.addMenu("Move to group")
         moves = {}
         for g in self.groups():
@@ -714,6 +875,13 @@ class PresetsWindow(QtWidgets.QWidget):
         elif chosen == a_upd:
             cur = self.get_current()
             self.presets[i] = dict(p, freq_hz=cur["freq_hz"], mode=cur["mode"])
+        elif chosen == a_pin:
+            q = dict(p)
+            if p.get("pinned"):
+                q.pop("pinned", None)
+            else:
+                q["pinned"] = True
+            self.presets[i] = q
         elif chosen in moves:
             self.presets[i] = dict(p, group=moves[chosen])
         elif chosen == a_newg:
@@ -760,6 +928,12 @@ class PresetsWindow(QtWidgets.QWidget):
         n = sum(1 for p in self.presets if p["group"] == group)
         menu = QtWidgets.QMenu(self)
         a_ren = menu.addAction("Rename…")
+        cmenu = menu.addMenu("Colour")
+        colours = {}
+        for cname, chex in GROUP_PALETTE:
+            colours[cmenu.addAction(dot_icon(chex), cname)] = chex
+        cmenu.addSeparator()
+        a_custom = cmenu.addAction("Custom…")
         a_up = menu.addAction("Move up")
         a_up.setEnabled(idx > 0)
         a_down = menu.addAction("Move down")
@@ -771,7 +945,15 @@ class PresetsWindow(QtWidgets.QWidget):
         chosen = menu.exec(hdr.mapToGlobal(pos))
         if chosen is None:
             return
-        if chosen == a_ren:
+        if chosen in colours:
+            self.group_colors[group] = colours[chosen]
+        elif chosen == a_custom:
+            c = QtWidgets.QColorDialog.getColor(QtGui.QColor(self.color_of(group)), self,
+                                                f"Colour for {group}")
+            if not c.isValid():
+                return
+            self.group_colors[group] = c.name()
+        elif chosen == a_ren:
             name = self._ask_group_name("Rename group", group)
             if not name or name == group:
                 return
@@ -779,6 +961,8 @@ class PresetsWindow(QtWidgets.QWidget):
                 if p["group"] == group:
                     self.presets[i] = dict(p, group=name)
             self.group_order = [name if g == group else g for g in groups]
+            if group in self.group_colors:
+                self.group_colors[name] = self.group_colors.pop(group)
             if group in self.collapsed:
                 self.collapsed.discard(group)
                 self.collapsed.add(name)

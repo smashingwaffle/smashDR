@@ -34,7 +34,7 @@ import settings as cfg
 from dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.2.4"
+VERSION = "0.2.5"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -952,6 +952,8 @@ class MainWindow(QtWidgets.QMainWindow):
                                  f"NAC 0x{ev['nac']:03X}  ·  {ev['tsdu_per_s']:.0f} TSDU/s "
                                  "<span style='color:gray'>(talkgroup decode comes next)</span>")
             return
+        if self.presets_win is not None:
+            self.presets_win.set_live(None if ev["type"] == "end" else self.target_hz)
         tg = ev.get("tgid")
         src = ev.get("src")
         parts = []
@@ -994,8 +996,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.presets_win = PresetsWindow(self._current_for_preset)
             self.presets_win.tune_requested.connect(self._tune_preset)
             self.presets_win.presets_changed.connect(self._on_presets_changed)
-            if not self._restore(self.presets_win, self.opts.get("presets_geometry")):
+            # v0.2.5 made the window bigger: place it once more on the second screen
+            if (self.opts.get("presets_layout") != 2
+                    or not self._restore(self.presets_win, self.opts.get("presets_geometry"))):
                 self._place_presets_window(self.presets_win)
+                self.opts["presets_layout"] = 2
             self.presets_win.set_active(self.target_hz, self.mode)
         self.presets_win.show()
         self.presets_win.raise_()
@@ -1026,10 +1031,11 @@ class MainWindow(QtWidgets.QMainWindow):
         """First time: fill the secondary screen if there is one."""
         primary = QtGui.QGuiApplication.primaryScreen()
         others = [s for s in QtGui.QGuiApplication.screens() if s is not primary]
-        if others:
-            win.setGeometry(others[0].availableGeometry())
-        else:
-            win.resize(1000, 900)
+        screen = others[0] if others else primary
+        avail = screen.availableGeometry()
+        w, h = min(1900, avail.width()), min(1040, avail.height())
+        win.resize(w, h)
+        win.move(avail.x() + (avail.width() - w) // 2, avail.y() + (avail.height() - h) // 2)
 
     def _current_for_preset(self) -> dict:
         return {"freq_hz": int(self.target_hz), "mode": self.mode,
