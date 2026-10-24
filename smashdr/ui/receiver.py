@@ -38,7 +38,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.3.5"
+VERSION = "0.3.6"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -730,7 +730,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.tx_view = QtWidgets.QTextBrowser()
         self.tx_view.setOpenLinks(False)
-        self.tx_view.anchorClicked.connect(QtGui.QDesktopServices.openUrl)
+        self._place_links = []
+        self.tx_view.anchorClicked.connect(self._open_place)
         ft = self.tx_view.font()
         ft.setPointSize(ft.pointSize() + 1)
         self.tx_view.setFont(ft)
@@ -1096,8 +1097,7 @@ class MainWindow(QtWidgets.QMainWindow):
         except OSError:
             pass
 
-    @staticmethod
-    def _explain_codes(text):
+    def _explain_codes(self, text):
         """(html with codes explained + places linked to Google Maps, plain text for the log)."""
         marks = [(s0, e0, "place", q) for s0, e0, q in places.find_places(text)]
         for match, meaning, s0, e0 in codes.annotate(text):
@@ -1110,7 +1110,9 @@ class MainWindow(QtWidgets.QMainWindow):
             parts_h.append(html.escape(text[pos:s0]))
             parts_t.append(text[pos:s0])
             if kind == "place":
-                parts_h.append(f"<a href='{html.escape(places.maps_url(val))}' "
+                # the link only carries an id; the real URL is looked up on click
+                self._place_links.append(places.maps_url(val))
+                parts_h.append(f"<a href='place:{len(self._place_links) - 1}' "
                                f"style='color:#4fc3f7'>{html.escape(seg)}</a>")
                 parts_t.append(seg)
             else:
@@ -1121,6 +1123,16 @@ class MainWindow(QtWidgets.QMainWindow):
         parts_h.append(html.escape(text[pos:]))
         parts_t.append(text[pos:])
         return "".join(parts_h), "".join(parts_t)
+
+    def _open_place(self, url):
+        ref = url.toString()
+        if ref.startswith("place:"):
+            try:
+                target = self._place_links[int(ref[6:])]
+            except (ValueError, IndexError):
+                return
+            print("[map]", target)
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(target))
 
     def _preset_name(self, freq_hz) -> str:
         if freq_hz is not None:

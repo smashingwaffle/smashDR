@@ -44,7 +44,8 @@ def _load():
 
 
 def maps_url(query: str) -> str:
-    return "https://www.google.com/maps/search/?api=1&query=" + quote_plus(query)
+    # path form: no "&" in the URL (it got mangled inside rich-text links)
+    return "https://www.google.com/maps/search/" + quote_plus(query)
 
 
 def _street_spans(text):
