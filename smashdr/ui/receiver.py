@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -50,7 +50,11 @@ TAG_CHARS = 12              # preset tags on the spectrum are cut to this length
 RATES_MSPS = [2.4, 1.92, 1.2, 0.96]
 STEPS_HZ = [1000, 2500, 5000, 6250, 7500, 8330, 10000, 12500, 15000, 20000,
             25000, 50000, 100000, 200000]
-PALETTES = ["inferno", "viridis", "plasma", "magma"]
+PALETTES = ["sdr", "inferno", "viridis", "plasma", "magma"]
+# classic SDR waterfall: black noise -> blue -> cyan -> yellow -> red peaks
+SDR_PALETTE = [(0.0, (0, 0, 0)), (0.15, (0, 0, 70)), (0.35, (0, 40, 200)),
+               (0.55, (0, 200, 255)), (0.75, (255, 255, 0)), (0.9, (255, 120, 0)),
+               (1.0, (255, 0, 0))]
 AVERAGING = {"Off": 1.0, "Low": 0.6, "Medium": 0.35, "High": 0.15}
 
 
@@ -1371,7 +1375,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _set_palette(self, name):
         try:
-            self.wf_img.setColorMap(pg.colormap.get(name))
+            if name == "sdr":
+                pos, cols = zip(*SDR_PALETTE)
+                self.wf_img.setColorMap(pg.ColorMap(list(pos), [c + (255,) for c in cols]))
+            else:
+                self.wf_img.setColorMap(pg.colormap.get(name))
         except Exception:
             self.wf_img.setColorMap(pg.colormap.get("inferno"))
 
@@ -1506,7 +1514,8 @@ class MainWindow(QtWidgets.QMainWindow):
             bins = (np.arange(FFT_SIZE) - FFT_SIZE / 2) * (rate / FFT_SIZE)
             self.freqs_mhz = (center + bins) / 1e6
             self.avg = spec.copy()
-            self.wf[:] = np.median(spec)
+            self.wf[:] = np.median(spec) - 10          # empty rows read as black
+            self._wf_lv = None
             f0 = self.freqs_mhz[0]
             span = rate / 1e6
             self._wf_rect = QtCore.QRectF(f0, 0, span, WF_ROWS)
@@ -1526,7 +1535,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wf[-n:] = rows[-n:]
         floor = float(np.median(spec))
         if self.wf_auto.isChecked():
-            levels = (floor - 5, floor + 45)
+            # noise just above black, strongest recent signal near the top (smoothed)
+            self._wf_n = getattr(self, "_wf_n", 0) + 1
+            if self._wf_n % 10 == 1 or getattr(self, "_wf_lv", None) is None:
+                recent = self.wf[-60:]
+                lo = float(np.percentile(recent, 40)) - 1.5
+                hi = max(float(np.percentile(recent, 99.8)) + 2.0, lo + 18.0)
+                old = getattr(self, "_wf_lv", None)
+                self._wf_lv = (lo, hi) if old is None else (
+                    0.7 * old[0] + 0.3 * lo, 0.7 * old[1] + 0.3 * hi)
+            levels = self._wf_lv
         else:
             levels = (self.wf_min.value(), max(self.wf_max.value(), self.wf_min.value() + 1))
         self.wf_img.setImage(self.wf, autoLevels=False, levels=levels)
@@ -1619,7 +1637,7 @@ DEFAULTS = {
     "gain": "auto", "rate_msps": 2.4, "ppm": 0, "bias_tee": False, "device_index": 0,
     "auto_band": True, "squelch_db": 10, "volume": 60, "mute": False,
     "nfm_deemph_us": 750, "wfm_deemph_us": 75, "ctcss_filter": True,
-    "wf_auto": True, "wf_min": -90, "wf_max": -40, "palette": "inferno",
+    "wf_auto": True, "wf_min": -90, "wf_max": -40, "palette": "sdr",
     "averaging": "Medium", "rec_dir": "", "preset_tags": True,
 }
 
