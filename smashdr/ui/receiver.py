@@ -38,7 +38,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.3.3"
+VERSION = "0.3.4"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -707,6 +707,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wf_plot.addItem(self.wf_marker)
         self.spec_plot.hideAxis("bottom")
 
+        self.spec_plot.scene().sigMouseMoved.connect(self._tag_hover)
         for p in (self.band_strip, self.spec_plot, self.wf_plot):
             p.scene().sigMouseClicked.connect(
                 lambda ev, plot=p: self._plot_clicked(ev, plot))
@@ -1353,11 +1354,46 @@ class MainWindow(QtWidgets.QMainWindow):
         self._tag_presets = presets
         self._draw_preset_tags()
 
+    @staticmethod
+    def _tag_tooltip(presets) -> str:
+        rows = []
+        for p in presets:
+            kind = p.get("digital") or p["mode"]
+            line = (f"<b>{html.escape(p['name'])}</b><br>"
+                    f"{p['freq_hz'] / 1e6:.4f} MHz &nbsp;·&nbsp; {html.escape(kind)}"
+                    f" &nbsp;·&nbsp; {html.escape(p['group'])}")
+            if p.get("note"):
+                line += f"<br><span style='color:gray'>{html.escape(p['note'])}</span>"
+            rows.append(line)
+        return "<p style='white-space:pre-wrap; max-width:420px'>" + "<hr>".join(rows) + "</p>"
+
+    def _tag_hover(self, scene_pos):
+        """Tooltip for the preset tag under the mouse (top part of the spectrum)."""
+        info = getattr(self, "_tag_info", None)
+        vb = self.spec_plot.getViewBox()
+        if not info or not vb.sceneBoundingRect().contains(scene_pos):
+            QtWidgets.QToolTip.hideText()
+            return
+        pt = vb.mapSceneToView(scene_pos)
+        if pt.y() < -45:                             # tags hang from the top edge
+            QtWidgets.QToolTip.hideText()
+            return
+        best, best_px = None, 7.0
+        for f_mhz, tip in info:
+            px = abs(vb.mapViewToScene(QtCore.QPointF(f_mhz, pt.y())).x() - scene_pos.x())
+            if px < best_px:
+                best, best_px = tip, px
+        if best:
+            QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), best, self.spec_plot)
+        else:
+            QtWidgets.QToolTip.hideText()
+
     def _draw_preset_tags(self):
         """Short vertical name tags at the top of the spectrum for presets in view."""
         for it in self._tag_items:
             self.spec_plot.removeItem(it)
         self._tag_items = []
+        self._tag_info = []                          # (freq MHz, tooltip html)
         if not self.tags_chk.isChecked() or self.center_hz is None:
             return
         lo = self.center_hz - self.rate_hz / 2
@@ -1376,6 +1412,8 @@ class MainWindow(QtWidgets.QMainWindow):
             t.setZValue(-5)
             self.spec_plot.addItem(t)
             self._tag_items.append(t)
+            same = [q for q in self._tag_presets if q["freq_hz"] == f]
+            self._tag_info.append((f / 1e6, self._tag_tooltip(same)))
 
     def on_frame(self, spec, center, rate, stats):
         if center != self.center_hz or rate != self.rate_hz:
