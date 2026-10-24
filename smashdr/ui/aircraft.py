@@ -12,7 +12,7 @@ import time
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from smashdr.core import airlines
+from smashdr.core import airlines, airports
 from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import cu8_to_iq
 from smashdr.decoders import adsb
@@ -224,7 +224,7 @@ function selectPlane(icao, center){
 map.on('click', function(){ if (selected){ selectPlane(null); console.log('SELECT:'); } });
 </script></body></html>"""
 
-COLS = ["Flight", "Airline", "Alt ft", "Speed kt", "Hdg", "V/S fpm", "Dist mi",
+COLS = ["Flight", "Airline", "LA airport", "Alt ft", "Speed kt", "Hdg", "V/S fpm", "Dist mi",
         "Squawk", "ICAO", "Seen"]
 C_ICAO = COLS.index("ICAO")
 ARROWS = "↑↗→↘↓↙←↖"
@@ -304,6 +304,7 @@ class InfoCard(QtWidgets.QFrame):
         self.route = QtWidgets.QLabel()
         self.route.setObjectName("route")
         self.route.setWordWrap(True)
+        self.route.setTextFormat(QtCore.Qt.TextFormat.RichText)
         self.type_lbl = QtWidgets.QLabel()
         self.type_lbl.setObjectName("sub")
         self.type_lbl.setWordWrap(True)
@@ -587,10 +588,8 @@ class AircraftTab(QtWidgets.QWidget):
         else:
             c.badge.hide()
         c.flight.setText(name or p["icao"])
-        route = self._routes.get(p["callsign"])
+        c.route.setText(self._route_html(p, lookup))
         info = self._info.get(p["icao"])
-        c.route.setText(route or ("Route: looking up…" if lookup and p["callsign"] else
-                                  (p["callsign"] or "No callsign yet")))
         if info:
             c.type_lbl.setText(info["text"])
         elif p["rotor"]:
@@ -617,6 +616,35 @@ class AircraftTab(QtWidgets.QWidget):
         c.live.setText("  ·  ".join(parts))
         if lookup:
             self._lookup(p)
+
+    def _route_html(self, p, lookup):
+        """Route line: what the plane is doing (inferred) checked against the database."""
+        seen = airports.infer(p)
+        db = self._routes.get(p["callsign"]) if p["callsign"] else None
+        parts = []
+        if seen:
+            kind, code, name = seen
+            word = "Arriving" if kind == "arr" else "Departed"
+            parts.append(f"<b>{word} {code}</b> {name} "
+                         "<span style='color:#9aa0a6; font-size:10pt'>(from its flight path)</span>")
+        if isinstance(db, dict):
+            (o, oc), (d, dc) = db["orig"], db["dest"]
+            text = f"{o} {oc}  →  {d} {dc}"
+            if seen and seen[1] not in (o, d):
+                parts.append(f"<span style='color:#80868b; font-size:10pt'>database: {text} · "
+                             "doesn't match, probably an old or different leg</span>")
+            elif seen:
+                parts.append(f"<span style='color:#9aa0a6; font-size:10pt'>{text} ✓</span>")
+            else:
+                parts.append(f"{text} <span style='color:#80868b; font-size:10pt'>"
+                             "(usual route for this flight number, not confirmed)</span>")
+        elif db == "unknown" and not seen:
+            parts.append("<span style='color:#9aa0a6'>Route unknown</span>")
+        elif db is None and p["callsign"] and lookup:
+            parts.append("<span style='color:#9aa0a6'>Route: looking up…</span>")
+        if not parts:
+            parts.append(p["callsign"] or "No callsign yet")
+        return "<br>".join(parts)
 
     def _get(self, url, handler):
         req = QtNetwork.QNetworkRequest(QtCore.QUrl(url))
@@ -684,11 +712,11 @@ class AircraftTab(QtWidgets.QWidget):
         if isinstance(r, dict) and r.get("origin") and r.get("destination"):
             def ap(x):
                 x = x if isinstance(x, dict) else {}
-                city = x.get("municipality") or x.get("name") or ""
-                return f"{x.get('iata_code') or x.get('icao_code') or '?'} {city}".strip()
-            self._routes[cs] = f"{ap(r['origin'])}  →  {ap(r['destination'])}"
+                return (x.get("iata_code") or x.get("icao_code") or "?",
+                        x.get("municipality") or x.get("name") or "")
+            self._routes[cs] = {"orig": ap(r["origin"]), "dest": ap(r["destination"])}
         else:
-            self._routes[cs] = "Route unknown"
+            self._routes[cs] = "unknown"
         p = self._planes.get(self._selected)
         if p and p["callsign"] == cs:
             self._update_card()
@@ -740,8 +768,17 @@ class AircraftTab(QtWidgets.QWidget):
                       if vr is not None else "", vr)
             if vr:
                 vs.setForeground(QtGui.QColor("#81c784" if vr > 0 else "#e57373"))
+            seen = airports.infer(p)
+            if seen:
+                kind, acode, _aname = seen
+                port = QtWidgets.QTableWidgetItem(("▼ " if kind == "arr" else "▲ ") + acode)
+                port.setForeground(QtGui.QColor("#ffb74d" if kind == "arr" else "#81c784"))
+                port.setToolTip(("Arriving " if kind == "arr" else "Departed ") + _aname +
+                                " (from its flight path)")
+            else:
+                port = QtWidgets.QTableWidgetItem("")
             cells = [
-                flight, airline, alt,
+                flight, airline, port, alt,
                 _Num(f"{p['gs']:.0f}" if p["gs"] is not None else "", p["gs"]),
                 hdg, vs,
                 _Num(f"{dist_mi:.1f}" if dist_mi is not None else "", dist_mi),

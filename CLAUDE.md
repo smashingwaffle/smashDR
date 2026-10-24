@@ -93,6 +93,10 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   _MapPage), info card with route/type/photo from api.adsbdb.com (free, no key,
   looked up only for the selected plane), airline badges from data/airlines.json
   (`core/airlines.py`; no real logos: trademarks), altitude colour scale.
+  adsbdb routes are "usual route per flight number" and often wrong:
+  `core/airports.py` infers arriving/departed SoCal airport from position,
+  track, altitude, climb (airline callsigns -> airline airports only) and the
+  card flags database routes that disagree.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 
