@@ -34,10 +34,11 @@ import settings as cfg
 from dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
+WF_SPLIT = 3                # waterfall rows per USB block (~27 rows/s at 2.4 MS/s)
 TAG_CHARS = 12              # preset tags on the spectrum are cut to this length
 RATES_MSPS = [2.4, 1.92, 1.2, 0.96]
 STEPS_HZ = [1000, 2500, 5000, 6250, 7500, 8330, 10000, 12500, 15000, 20000,
@@ -392,7 +393,9 @@ class SdrReader(QtCore.QThread):
             u8 = np.frombuffer(raw, dtype=np.uint8)
             clip = 100.0 * np.count_nonzero((u8 == 0) | (u8 == 255)) / len(u8)
             iq = cu8_to_iq(raw)
-            spec = power_spectrum_db(iq)
+            # waterfall rows from sub-blocks (faster scroll); spectrum = their mean
+            rows = np.stack([power_spectrum_db(b) for b in np.array_split(iq, WF_SPLIT)])
+            spec = 10.0 * np.log10(np.mean(10.0 ** (rows / 10.0), axis=0))
             center = float(self.sdr.center_freq)
             rate = float(self.sdr.sample_rate)
 
@@ -410,7 +413,8 @@ class SdrReader(QtCore.QThread):
 
             stats = {"clip": clip, "snr": snr, "sq_open": sq_open,
                      "drops": self._cap.dropped,
-                     "rec_mb": self._rec_bytes / 1e6 if self._rec else None}
+                     "rec_mb": self._rec_bytes / 1e6 if self._rec else None,
+                     "wf_rows": rows}
             self.frame.emit(spec, center, rate, stats)
 
         self._cap.stop()
@@ -1212,8 +1216,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.avg = (1 - alpha) * self.avg + alpha * spec
         self.spec_curve.setData(self.freqs_mhz, self.avg)
 
-        self.wf[:-1] = self.wf[1:]
-        self.wf[-1] = spec
+        rows = stats.get("wf_rows")
+        if rows is None:
+            rows = spec[None, :]
+        n = min(len(rows), WF_ROWS)
+        self.wf[:-n] = self.wf[n:]
+        self.wf[-n:] = rows[-n:]
         floor = float(np.median(spec))
         if self.wf_auto.isChecked():
             levels = (floor - 5, floor + 45)
