@@ -121,7 +121,8 @@ html,body,#map{height:100%;margin:0;background:#1e1e1e}
 .osm-dark{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9)}
 .leaflet-container{font-family:Segoe UI,Arial,sans-serif}
 </style></head><body><div id="map"></div><script>
-var map = L.map('map', {zoomControl:true}).setView([__LAT__, __LON__], 9);
+var VIEW = __VIEW__;
+var map = L.map('map', {zoomControl:true}).setView(VIEW ? [VIEW[0], VIEW[1]] : [__LAT__, __LON__], VIEW ? VIEW[2] : 9);
 var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
 var cartoKey = __CARTO_KEY__;
 var dark = L.layerGroup([
@@ -137,11 +138,13 @@ if (cartoKey) {
       + encodeURIComponent(cartoKey), {maxNativeZoom: 18, maxZoom: 20,
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO'});
   layers = Object.assign({'Dark (CARTO)': carto}, layers);
-  carto.addTo(map);
-} else {
-  dark.addTo(map);
 }
+var want = __LAYER__;
+(layers[want] || (cartoKey ? layers['Dark (CARTO)'] : dark)).addTo(map);
 L.control.layers(layers, null, {position: 'topright'}).addTo(map);
+map.on('baselayerchange', function(e){ console.log('LAYER:' + e.name); });
+map.on('moveend', function(){ var c = map.getCenter();
+  console.log('VIEW:' + c.lat.toFixed(5) + ',' + c.lng.toFixed(5) + ',' + map.getZoom()); });
 L.circleMarker([__LAT__, __LON__], {radius:5, color:'#ffd54f', weight:2,
   fillOpacity:0.6}).addTo(map).bindTooltip('home');
 [25, 50, 100, 150].forEach(function(mi){ L.circle([__LAT__, __LON__], {radius: mi*1609.344,
@@ -246,10 +249,15 @@ if HAVE_WEB:
     class _MapPage(QWebEnginePage):
         """Map -> Python: the page logs 'SELECT:<icao>' when a plane is clicked."""
         selected = QtCore.pyqtSignal(str)
+        pref = QtCore.pyqtSignal(str, str)          # "layer"/"view", value
 
         def javaScriptConsoleMessage(self, level, message, line, source):
             if message.startswith("SELECT:"):
                 self.selected.emit(message[7:])
+            elif message.startswith("LAYER:"):
+                self.pref.emit("layer", message[6:])
+            elif message.startswith("VIEW:"):
+                self.pref.emit("view", message[5:])
 
 
 def _field(data, key):
@@ -382,7 +390,14 @@ class AircraftTab(QtWidgets.QWidget):
         self.table = QtWidgets.QTableWidget(0, len(COLS))
         self.table.setHorizontalHeaderLabels(COLS)
         self.table.setSortingEnabled(True)
-        self.table.sortByColumn(COLS.index("Dist mi"), QtCore.Qt.SortOrder.AscendingOrder)
+        sort = opts.get("adsb_sort")
+        try:
+            col, order = int(sort[0]), QtCore.Qt.SortOrder(int(sort[1]))
+            if not 0 <= col < len(COLS):
+                raise ValueError
+        except (TypeError, ValueError, IndexError):
+            col, order = COLS.index("Dist mi"), QtCore.Qt.SortOrder.AscendingOrder
+        self.table.sortByColumn(col, order)
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(30)
         self.table.setShowGrid(False)
@@ -414,6 +429,7 @@ class AircraftTab(QtWidgets.QWidget):
             self.map = QWebEngineView()
             self._page = _MapPage(self.map)
             self._page.selected.connect(self._map_selected)
+            self._page.pref.connect(self._map_pref)
             self.map.setPage(self._page)
             self.map.loadFinished.connect(self._map_loaded)
             self.reload_map()
@@ -425,10 +441,11 @@ class AircraftTab(QtWidgets.QWidget):
             self.map.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             self.map.setStyleSheet("color: gray;")
 
-        split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        split = self.split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
         split.addWidget(left)
         split.addWidget(self.map)
-        split.setSizes([1100, 2200])
+        sizes = opts.get("adsb_split")
+        split.setSizes(sizes if isinstance(sizes, list) and len(sizes) == 2 else [1100, 2200])
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.addLayout(bar)
@@ -487,10 +504,29 @@ class AircraftTab(QtWidgets.QWidget):
         self._map_ready = False
         lat, lon = self.lat_box.value(), self.lon_box.value()
         stops = json.dumps([[a, list(c)] for a, c in airlines.ALT_STOPS])
+        view = self.opts.get("adsb_map_view")
         html = (MAP_HTML.replace("__LAT__", f"{lat:.5f}").replace("__LON__", f"{lon:.5f}")
                 .replace("__ALT_STOPS__", stops)
+                .replace("__VIEW__", json.dumps(view if isinstance(view, list) and len(view) == 3 else None))
+                .replace("__LAYER__", json.dumps(str(self.opts.get("adsb_map_layer", ""))))
                 .replace("__CARTO_KEY__", json.dumps(str(self.opts.get("carto_key", "")).strip())))
         self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/"))
+
+    def _map_pref(self, kind, value):
+        if kind == "layer":
+            self.opts["adsb_map_layer"] = value
+        elif kind == "view":
+            try:
+                lat, lon, z = value.split(",")
+                self.opts["adsb_map_view"] = [float(lat), float(lon), int(z)]
+            except ValueError:
+                pass
+
+    def collect(self):
+        """Put the tab's layout state into opts (called before settings are saved)."""
+        self.opts["adsb_split"] = self.split.sizes()
+        hh = self.table.horizontalHeader()
+        self.opts["adsb_sort"] = [hh.sortIndicatorSection(), hh.sortIndicatorOrder().value]
 
     def _map_loaded(self, ok):
         self._map_ready = bool(ok)

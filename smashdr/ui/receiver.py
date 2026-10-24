@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -535,12 +535,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.reader = SdrReader(sdr, opts)
 
-        tabs = QtWidgets.QTabWidget()
+        tabs = self.tabs = QtWidgets.QTabWidget()
         tabs.addTab(self._build_receiver_tab(), "Receiver")
         self.aircraft_tab = AircraftTab(opts, list_devices(),
                                         int(opts.get("_opened_device", opts["device_index"])))
         tabs.addTab(self.aircraft_tab, "Aircraft")
         tabs.addTab(self._build_settings_tab(), "Settings")
+        tabs.setCurrentIndex(min(max(int(opts.get("tab", 0)), 0), tabs.count() - 1))
+        # save settings every 30 s too, so a crash or power cut doesn't lose them
+        self._autosave = QtCore.QTimer(self)
+        self._autosave.timeout.connect(self._save_opts)
+        self._autosave.start(30_000)
         self.setCentralWidget(tabs)
 
         self.audio_out = audio.AudioOut() if audio else None
@@ -725,12 +730,18 @@ class MainWindow(QtWidgets.QMainWindow):
         tl.addLayout(tx_head)
         tl.addWidget(self.tx_view, 1)
 
-        hsplit = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        hsplit = self.tx_split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
         hsplit.addWidget(split)
         hsplit.addWidget(tx_panel)
         hsplit.setStretchFactor(0, 1)
         hsplit.setStretchFactor(1, 0)
-        hsplit.setSizes([2800, 520])
+        self.spec_split = split
+        for sp, key, default in ((hsplit, "split_tx", [2800, 520]), (split, "split_spec", None)):
+            sizes = self.opts.get(key)
+            if isinstance(sizes, list) and len(sizes) == 2 and all(isinstance(x, int) for x in sizes):
+                sp.setSizes(sizes)
+            elif default:
+                sp.setSizes(default)
 
         lay = QtWidgets.QVBoxLayout()
         lay.addLayout(row1)
@@ -1480,20 +1491,19 @@ class MainWindow(QtWidgets.QMainWindow):
     # ======================================================================
     # Shutdown
     # ======================================================================
-    def closeEvent(self, ev):
-        self.aircraft_tab.stop()
+    def _collect_opts(self):
+        """Current UI state -> self.opts."""
         self.opts["main_geometry"] = bytes(self.saveGeometry().toHex()).decode()
         if self.presets_win is not None:
             self.opts["presets_open"] = self.presets_win.isVisible()
             self.opts["presets_geometry"] = bytes(self.presets_win.saveGeometry().toHex()).decode()
-            self.presets_win.close()
         else:
             self.opts["presets_open"] = False
-        self.reader.stop()
-        self.reader.wait(3000)
-        if self.audio_out:
-            self.audio_out.close()
+        self.aircraft_tab.collect()
         self.opts.update(
+            tab=self.tabs.currentIndex(),
+            split_tx=self.tx_split.sizes(),
+            split_spec=self.spec_split.sizes(),
             freq_mhz=round(self.target_hz / 1e6, 6),
             mode=self.mode,
             step_hz=self.step_hz,
@@ -1516,12 +1526,27 @@ class MainWindow(QtWidgets.QMainWindow):
             preset_tags=self.tags_chk.isChecked(),
             rec_dir=self.rec_dir_edit.text().strip(),
             stt_model=self.stt_box.currentData(),
+            carto_key=self.carto_edit.text().strip(),
         )
-        self.opts.pop("_opened_device", None)
+
+    def _save_opts(self):
         try:
-            cfg.save(self.opts)
-        except OSError as e:
+            self._collect_opts()
+            data = {k: v for k, v in self.opts.items() if not k.startswith("_")}
+            cfg.save(data)
+        except Exception as e:                      # never let saving take the app down
             print("[!] Could not save settings:", e)
+
+    def closeEvent(self, ev):
+        self._autosave.stop()
+        self._save_opts()
+        self.aircraft_tab.stop()
+        if self.presets_win is not None:
+            self.presets_win.close()
+        self.reader.stop()
+        self.reader.wait(3000)
+        if self.audio_out:
+            self.audio_out.close()
         super().closeEvent(ev)
 
 
