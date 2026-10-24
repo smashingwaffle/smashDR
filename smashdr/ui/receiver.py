@@ -32,13 +32,13 @@ import numpy as np
 
 from smashdr.core import bandplan
 from smashdr.core import settings as cfg
-from smashdr.core import codes, transcribe
+from smashdr.core import codes, places, transcribe
 from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.3.4"
+VERSION = "0.3.5"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -730,6 +730,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.tx_view = QtWidgets.QTextBrowser()
         self.tx_view.setOpenLinks(False)
+        self.tx_view.anchorClicked.connect(QtGui.QDesktopServices.openUrl)
         ft = self.tx_view.font()
         ft.setPointSize(ft.pointSize() + 1)
         self.tx_view.setFont(ft)
@@ -1097,14 +1098,25 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @staticmethod
     def _explain_codes(text):
-        """(html with codes highlighted + explained, plain text with [meanings])."""
-        parts_h, parts_t, pos = [], [], 0
+        """(html with codes explained + places linked to Google Maps, plain text for the log)."""
+        marks = [(s0, e0, "place", q) for s0, e0, q in places.find_places(text)]
         for match, meaning, s0, e0 in codes.annotate(text):
+            if all(e0 <= a or s0 >= b for a, b, _k, _v in marks):
+                marks.append((s0, e0, "code", meaning))
+        marks.sort()
+        parts_h, parts_t, pos = [], [], 0
+        for s0, e0, kind, val in marks:
+            seg = text[s0:e0]
             parts_h.append(html.escape(text[pos:s0]))
             parts_t.append(text[pos:s0])
-            parts_h.append(f"<b style='color:#ffd54f'>{html.escape(match)}</b> "
-                           f"<span style='color:#9fa8da'>[{html.escape(meaning)}]</span>")
-            parts_t.append(f"{match} [{meaning}]")
+            if kind == "place":
+                parts_h.append(f"<a href='{html.escape(places.maps_url(val))}' "
+                               f"style='color:#4fc3f7'>{html.escape(seg)}</a>")
+                parts_t.append(seg)
+            else:
+                parts_h.append(f"<b style='color:#ffd54f'>{html.escape(seg)}</b> "
+                               f"<span style='color:#9fa8da'>[{html.escape(val)}]</span>")
+                parts_t.append(f"{seg} [{val}]")
             pos = e0
         parts_h.append(html.escape(text[pos:]))
         parts_t.append(text[pos:])

@@ -1,0 +1,254 @@
+{
+ "note": "Local street names for transcript map links (Boyle Heights, Lincoln Heights, El Sereno, Highland Park, downtown). ambiguous = only linked with a suffix, house number or intersection.",
+ "streets": [
+  {
+   "name": "Cesar Chavez"
+  },
+  {
+   "name": "Cesar E Chavez"
+  },
+  {
+   "name": "Soto"
+  },
+  {
+   "name": "Whittier"
+  },
+  {
+   "name": "Olympic",
+   "ambiguous": true
+  },
+  {
+   "name": "Lorena",
+   "ambiguous": true
+  },
+  {
+   "name": "Indiana",
+   "ambiguous": true
+  },
+  {
+   "name": "State",
+   "ambiguous": true
+  },
+  {
+   "name": "Mission",
+   "ambiguous": true
+  },
+  {
+   "name": "Marengo",
+   "ambiguous": true
+  },
+  {
+   "name": "Valley",
+   "ambiguous": true
+  },
+  {
+   "name": "Huntington"
+  },
+  {
+   "name": "Eastern",
+   "ambiguous": true
+  },
+  {
+   "name": "Main",
+   "ambiguous": true
+  },
+  {
+   "name": "Broadway",
+   "ambiguous": true
+  },
+  {
+   "name": "North Broadway"
+  },
+  {
+   "name": "Figueroa"
+  },
+  {
+   "name": "Alameda",
+   "ambiguous": true
+  },
+  {
+   "name": "San Fernando"
+  },
+  {
+   "name": "Daly",
+   "ambiguous": true
+  },
+  {
+   "name": "Pasadena"
+  },
+  {
+   "name": "York"
+  },
+  {
+   "name": "Colorado",
+   "ambiguous": true
+  },
+  {
+   "name": "Eagle Rock"
+  },
+  {
+   "name": "Monterey"
+  },
+  {
+   "name": "Boyle",
+   "ambiguous": true
+  },
+  {
+   "name": "Euclid",
+   "ambiguous": true
+  },
+  {
+   "name": "Evergreen",
+   "ambiguous": true
+  },
+  {
+   "name": "Wabash"
+  },
+  {
+   "name": "City Terrace"
+  },
+  {
+   "name": "Marianna"
+  },
+  {
+   "name": "Ford",
+   "ambiguous": true
+  },
+  {
+   "name": "Atlantic",
+   "ambiguous": true
+  },
+  {
+   "name": "Hill",
+   "ambiguous": true
+  },
+  {
+   "name": "Spring",
+   "ambiguous": true
+  },
+  {
+   "name": "Los Angeles"
+  },
+  {
+   "name": "Temple",
+   "ambiguous": true
+  },
+  {
+   "name": "Sunset",
+   "ambiguous": true
+  },
+  {
+   "name": "Alhambra"
+  },
+  {
+   "name": "Mercury",
+   "ambiguous": true
+  },
+  {
+   "name": "Lombardy",
+   "ambiguous": true
+  },
+  {
+   "name": "Collis",
+   "ambiguous": true
+  },
+  {
+   "name": "Multnomah"
+  },
+  {
+   "name": "Van Horne"
+  },
+  {
+   "name": "Marmion"
+  },
+  {
+   "name": "Monte Vista"
+  },
+  {
+   "name": "Griffin",
+   "ambiguous": true
+  },
+  {
+   "name": "Fremont"
+  },
+  {
+   "name": "Mott"
+  },
+  {
+   "name": "Chicago"
+  },
+  {
+   "name": "Fickett"
+  },
+  {
+   "name": "Breed"
+  },
+  {
+   "name": "Gless"
+  },
+  {
+   "name": "Pecan"
+  },
+  {
+   "name": "Mathews"
+  },
+  {
+   "name": "Esperanza"
+  },
+  {
+   "name": "Cornwell"
+  },
+  {
+   "name": "Hostetter"
+  },
+  {
+   "name": "Rowan"
+  },
+  {
+   "name": "Ditman"
+  },
+  {
+   "name": "Downey"
+  },
+  {
+   "name": "Washington"
+  },
+  {
+   "name": "Pico"
+  },
+  {
+   "name": "Glendale"
+  },
+  {
+   "name": "Riverside"
+  },
+  {
+   "name": "Hyperion"
+  },
+  {
+   "name": "Fletcher"
+  },
+  {
+   "name": "Cypress"
+  },
+  {
+   "name": "Pleasant",
+   "ambiguous": true
+  },
+  {
+   "name": "Lancaster"
+  },
+  {
+   "name": "Darwin"
+  },
+  {
+   "name": "Workman"
+  },
+  {
+   "name": "Sichel"
+  },
+  {
+   "name": "Gibbons"
+  }
+ ]
+}

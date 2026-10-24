@@ -82,6 +82,8 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
 - `core/codes.py` + `data/codes.json`: codes in transcripts (Code N, 10-/11-codes,
   PC/VC/H&S numbers, address-guarded) get highlighted + explained. Glossary from
   Stefaan's CA list; `lapd: true` entries override (LAPD Code 6 = out to investigate).
+- `core/places.py` + `data/streets.json`: addresses / streets / intersections in
+  transcripts become Google Maps links (", Los Angeles, CA" appended).
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 
