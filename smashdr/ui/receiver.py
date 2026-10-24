@@ -38,10 +38,12 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
+ANALOG_HANG_S = 1.2         # analog: squelch shut this long = end of transmission
+ANALOG_MAX_S = 30.0         # analog: transcribe in chunks if the squelch stays open
 WF_SPLIT = 3                # waterfall rows per USB block (~27 rows/s at 2.4 MS/s)
 TAG_CHARS = 12              # preset tags on the spectrum are cut to this length
 RATES_MSPS = [2.4, 1.92, 1.2, 0.96]
@@ -230,6 +232,9 @@ class SdrReader(QtCore.QThread):
         self._cap = None
         # speech-to-text of finished clear P25 calls (optional: pip install faster-whisper)
         self._call_pcm = None               # list of 48 kHz chunks while a call is up
+        self._an_pcm = None                 # same for analog (squelch-gated)
+        self._an_meta = None
+        self._an_last = 0.0
         self._call_meta = None
         self.transcriber = None
         if transcribe.available():
@@ -323,7 +328,32 @@ class SdrReader(QtCore.QThread):
                 self.transcriber.submit(np.concatenate(self._call_pcm), meta)
             self._call_pcm = self._call_meta = None
 
+    def _track_analog(self, pcm, sq_open):
+        """Analog NFM/AM: a transmission = squelch open until it stays shut for ANALOG_HANG_S."""
+        if self.transcriber is None or self.mode not in ("NFM", "AM") or self.squelch_db <= 0:
+            self._an_pcm = None
+            return
+        now = time.time()
+        if sq_open:
+            if self._an_pcm is None:
+                self._an_pcm = []
+                self._an_meta = {"type": "analog", "mode": self.mode, "encrypted": False,
+                                 "freq_hz": self.target_hz, "t_start": now}
+            self._an_last = now
+        if self._an_pcm is None:
+            return
+        self._an_pcm.append(pcm)
+        ended = not sq_open and now - self._an_last > ANALOG_HANG_S
+        too_long = now - self._an_meta["t_start"] > ANALOG_MAX_S
+        if ended or too_long:
+            audio = np.concatenate(self._an_pcm)
+            if ended:                                  # drop the silent hang tail
+                audio = audio[:max(0, len(audio) - int(ANALOG_HANG_S * 48_000))]
+            self.transcriber.submit(audio, dict(self._an_meta, t_end=now))
+            self._an_pcm = None
+
     def _configure_demod(self):
+        self._an_pcm = None
         rate = float(self.sdr.sample_rate)
         off = self.target_hz - self.sdr.center_freq
         if self.mode in DIGITAL_MODES:
@@ -441,6 +471,7 @@ class SdrReader(QtCore.QThread):
             elif self._demod_ok:
                 pcm = self.demod.process(iq, sq_open)
                 self.audio.emit(pcm.tobytes())
+                self._track_analog(pcm, sq_open)
 
             stats = {"clip": clip, "snr": snr, "sq_open": sq_open,
                      "drops": self._cap.dropped,
@@ -702,7 +733,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ft.setPointSize(ft.pointSize() + 1)
         self.tx_view.setFont(ft)
         self.tx_view.setPlaceholderText(
-            "Speech-to-text of clear P25 calls appears here."
+            "Speech-to-text of clear P25 calls and analog NFM/AM transmissions appears here.\n\nAnalog needs the squelch set above 0."
             if transcribe.available() else
             "Speech-to-text is off.\n\nIn the VSCode terminal run:\n"
             "pip install faster-whisper\n\nthen restart (F5).")
@@ -917,7 +948,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stt_box.setCurrentIndex(max(0, i))
         self.stt_box.currentIndexChanged.connect(self._set_stt_model)
         stt_note = QtWidgets.QLabel(
-            "Transcribes clear P25 calls, on this PC (nothing goes online). Fast: a few seconds "
+            "Transcribes clear P25 calls and analog NFM/AM (squelch above 0), on this PC (nothing goes online). Fast: a few seconds "
             "per call. Accurate: better with codes and street names, slower, 1.6 GB download "
             "the first time." if transcribe.available() else
             "Off: run  pip install faster-whisper  in the VSCode terminal, then restart.")
@@ -1044,6 +1075,8 @@ class MainWindow(QtWidgets.QMainWindow):
             who.append(f"TG {r['tgid']}")
         if r.get("src") is not None:
             who.append(f"radio {r['src']}")
+        if r.get("type") == "analog":
+            who.append(r.get("mode", ""))
         head = f"{stamp}  {name}  {'  '.join(who)}  ({r.get('audio_s', 0):.1f} s)"
         if r.get("error"):
             body = f"<span style='color:#e53935'>{html.escape(r['error'])}</span>"
