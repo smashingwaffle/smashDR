@@ -34,7 +34,7 @@ import settings as cfg
 from dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300

@@ -80,19 +80,20 @@ def _read(path: Path):
     return {"presets": items,
             "collapsed": [str(g) for g in data.get("collapsed", [])],
             "defaults_seen": [str(k) for k in data.get("defaults_seen", [])],
-            "button_size": size if size in BUTTON_SIZES else DEFAULT_BUTTON_SIZE}
+            "button_size": size if size in BUTTON_SIZES else DEFAULT_BUTTON_SIZE,
+            "groups": [str(g) for g in data.get("groups", []) if str(g).strip()]}
 
 
 def load_store() -> dict:
     """User presets merged with any defaults they haven't seen yet."""
     defaults = _read(DEFAULT_STORE) or {"presets": [], "collapsed": [], "defaults_seen": [],
-                                        "button_size": DEFAULT_BUTTON_SIZE}
+                                        "button_size": DEFAULT_BUTTON_SIZE, "groups": []}
     user = _read(STORE)
     if user is None:
         return {"presets": list(defaults["presets"]),
                 "collapsed": list(defaults["collapsed"]),
                 "defaults_seen": [preset_key(p) for p in defaults["presets"]],
-                "button_size": DEFAULT_BUTTON_SIZE}
+                "button_size": DEFAULT_BUTTON_SIZE, "groups": []}
     seen = set(user["defaults_seen"]) or {preset_key(p) for p in user["presets"]}
     have = {preset_key(p) for p in user["presets"]}
     new_groups = []
@@ -226,8 +227,10 @@ def parse_radioreference(text: str, group: str = "Imported", group_by_tag: bool 
     return out, skipped
 
 
-def groups_in_order(presets: list) -> list:
-    seen = []
+def groups_in_order(presets: list, order: list = ()) -> list:
+    """Groups in the saved order (empty groups included), then any others in the
+    order their first preset appears."""
+    seen = [g for g in dict.fromkeys(order)]
     for p in presets:
         if p["group"] not in seen:
             seen.append(p["group"])
@@ -474,6 +477,7 @@ class PresetsWindow(QtWidgets.QWidget):
         self.collapsed = set(store["collapsed"])
         self.defaults_seen = store["defaults_seen"]
         self.button_size = store["button_size"]
+        self.group_order = list(store.get("groups", []))      # all groups, may include empty ones
         self._buttons = []
         self._sections = {}           # group -> (header button, holder widget)
         self._active = None          # (freq_hz, mode)
@@ -483,6 +487,8 @@ class PresetsWindow(QtWidgets.QWidget):
         imp_btn = QtWidgets.QPushButton("Import…")
         imp_btn.setToolTip("Paste rows copied from RadioReference")
         imp_btn.clicked.connect(self.import_rr)
+        grp_btn = QtWidgets.QPushButton("New group…")
+        grp_btn.clicked.connect(lambda: self.new_group())
         exp_btn = QtWidgets.QToolButton()
         exp_btn.setText("Expand all")
         exp_btn.clicked.connect(lambda: self._set_all_collapsed(False))
@@ -498,6 +504,7 @@ class PresetsWindow(QtWidgets.QWidget):
         bar = QtWidgets.QHBoxLayout()
         bar.addWidget(add_btn)
         bar.addWidget(imp_btn)
+        bar.addWidget(grp_btn)
         bar.addWidget(self.filter, 1)
         bar.addWidget(self.count_lbl)
         self.size_box = QtWidgets.QComboBox()
@@ -533,7 +540,7 @@ class PresetsWindow(QtWidgets.QWidget):
                 it.widget().deleteLater()
         self._buttons = []
         self._sections = {}
-        for group in groups_in_order(self.presets):
+        for group in self.groups():
             n = sum(1 for p in self.presets if p["group"] == group)
             hdr = QtWidgets.QToolButton()
             hdr.setObjectName("groupHeader")
@@ -546,8 +553,17 @@ class PresetsWindow(QtWidgets.QWidget):
             f = hdr.font()
             f.setBold(True)
             hdr.setFont(f)
+            hdr.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+            hdr.customContextMenuRequested.connect(
+                lambda pos, g=group, h=hdr: self._group_menu(g, h, pos))
+            hdr.setToolTip("Click to collapse / expand, right-click to rename, move or delete")
             holder = QtWidgets.QWidget()
             flow = FlowLayout(holder)
+            if n == 0:
+                hint = QtWidgets.QLabel("Empty group: right-click a preset > Move to group, "
+                                        "or Add current")
+                hint.setStyleSheet("color: gray; padding: 4px;")
+                flow.addWidget(hint)
             for p in self.presets:
                 if p["group"] != group:
                     continue
@@ -631,16 +647,18 @@ class PresetsWindow(QtWidgets.QWidget):
 
     def _save(self):
         try:
+            self.group_order = self.groups()
             save_store({"presets": self.presets, "collapsed": sorted(self.collapsed),
                         "defaults_seen": self.defaults_seen,
-                        "button_size": self.button_size})
+                        "button_size": self.button_size,
+                        "groups": self.group_order})
         except OSError as e:
             QtWidgets.QMessageBox.warning(self, "Presets", f"Couldn't save presets: {e}")
         self.presets_changed.emit(list(self.presets))
 
     def add_current(self):
         cur = self.get_current()
-        groups = groups_in_order(self.presets) or ["General"]
+        groups = self.groups() or ["General"]
         dlg = PresetDialog({"name": f"{cur['freq_hz'] / 1e6:.4f}", **cur}, groups, self,
                            title="Add preset")
         if dlg.exec():
@@ -649,7 +667,7 @@ class PresetsWindow(QtWidgets.QWidget):
             self.rebuild()
 
     def import_rr(self):
-        dlg = ImportDialog(groups_in_order(self.presets), self)
+        dlg = ImportDialog(self.groups(), self)
         if not dlg.exec():
             return
         ps, skipped = dlg.parsed()
@@ -673,6 +691,14 @@ class PresetsWindow(QtWidgets.QWidget):
         a_edit = menu.addAction("Edit…")
         a_dup = menu.addAction("Duplicate")
         a_upd = menu.addAction("Update to current frequency")
+        move = menu.addMenu("Move to group")
+        moves = {}
+        for g in self.groups():
+            a = move.addAction(g)
+            a.setEnabled(g != p["group"])
+            moves[a] = g
+        move.addSeparator()
+        a_newg = move.addAction("New group…")
         menu.addSeparator()
         a_del = menu.addAction("Delete")
         chosen = menu.exec(btn.mapToGlobal(pos))
@@ -680,7 +706,7 @@ class PresetsWindow(QtWidgets.QWidget):
             return
         i = self.presets.index(p)
         if chosen == a_edit:
-            dlg = PresetDialog(p, groups_in_order(self.presets), self)
+            dlg = PresetDialog(p, self.groups(), self)
             if dlg.exec():
                 self.presets[i] = dlg.result_preset()
         elif chosen == a_dup:
@@ -688,11 +714,90 @@ class PresetsWindow(QtWidgets.QWidget):
         elif chosen == a_upd:
             cur = self.get_current()
             self.presets[i] = dict(p, freq_hz=cur["freq_hz"], mode=cur["mode"])
+        elif chosen in moves:
+            self.presets[i] = dict(p, group=moves[chosen])
+        elif chosen == a_newg:
+            g = self.new_group(rebuild=False)
+            if not g:
+                return
+            self.presets[i] = dict(p, group=g)
         elif chosen == a_del:
             if QtWidgets.QMessageBox.question(self, "Delete preset",
                                               f"Delete “{p['name']}”?") != \
                     QtWidgets.QMessageBox.StandardButton.Yes:
                 return
             self.presets.pop(i)
+        self._save()
+        self.rebuild()
+
+    # ---- groups ----
+    def groups(self) -> list:
+        return groups_in_order(self.presets, self.group_order)
+
+    def _ask_group_name(self, title, text=""):
+        name, ok = QtWidgets.QInputDialog.getText(self, title, "Group name:", text=text)
+        name = name.strip()
+        if not ok or not name:
+            return None
+        if name in self.groups() and name != text:
+            QtWidgets.QMessageBox.information(self, title, f"There's already a group “{name}”.")
+            return None
+        return name
+
+    def new_group(self, rebuild=True):
+        name = self._ask_group_name("New group")
+        if name:
+            self.group_order = self.groups() + [name]
+            self.collapsed.discard(name)
+            if rebuild:
+                self._save()
+                self.rebuild()
+        return name
+
+    def _group_menu(self, group, hdr, pos):
+        groups = self.groups()
+        idx = groups.index(group)
+        n = sum(1 for p in self.presets if p["group"] == group)
+        menu = QtWidgets.QMenu(self)
+        a_ren = menu.addAction("Rename…")
+        a_up = menu.addAction("Move up")
+        a_up.setEnabled(idx > 0)
+        a_down = menu.addAction("Move down")
+        a_down.setEnabled(idx < len(groups) - 1)
+        menu.addSeparator()
+        a_new = menu.addAction("New group…")
+        menu.addSeparator()
+        a_del = menu.addAction("Delete group" + (f" and its {n} preset(s)…" if n else ""))
+        chosen = menu.exec(hdr.mapToGlobal(pos))
+        if chosen is None:
+            return
+        if chosen == a_ren:
+            name = self._ask_group_name("Rename group", group)
+            if not name or name == group:
+                return
+            for i, p in enumerate(self.presets):
+                if p["group"] == group:
+                    self.presets[i] = dict(p, group=name)
+            self.group_order = [name if g == group else g for g in groups]
+            if group in self.collapsed:
+                self.collapsed.discard(group)
+                self.collapsed.add(name)
+        elif chosen in (a_up, a_down):
+            order = list(groups)
+            j = idx - 1 if chosen == a_up else idx + 1
+            order[idx], order[j] = order[j], order[idx]
+            self.group_order = order
+        elif chosen == a_new:
+            if not self.new_group(rebuild=False):
+                return
+        elif chosen == a_del:
+            if n and QtWidgets.QMessageBox.question(
+                    self, "Delete group",
+                    f"Delete “{group}” and the {n} preset(s) in it?") != \
+                    QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+            self.presets = [p for p in self.presets if p["group"] != group]
+            self.group_order = [g for g in groups if g != group]
+            self.collapsed.discard(group)
         self._save()
         self.rebuild()
