@@ -757,6 +757,47 @@
    "note": "Aviation emergency"
   },
   {
+   "name": "Air-1 123.025",
+   "freq_hz": 123025000,
+   "mode": "AM",
+   "group": "LAPD Air",
+   "step_hz": 25000,
+   "note": "Air-1 primary: helicopter calling / air-to-air, LA Basin \u00b7 your list (airnav / RadioReference); verify on RR"
+  },
+  {
+   "name": "Air-2 123.075",
+   "freq_hz": 123075000,
+   "mode": "AM",
+   "group": "LAPD Air",
+   "step_hz": 25000,
+   "note": "Air-2 secondary air-to-air / Hooper Heliport landing coordination \u00b7 your list (airnav / RadioReference); verify on RR"
+  },
+  {
+   "name": "Hooper ASC 1",
+   "freq_hz": 122750000,
+   "mode": "AM",
+   "group": "LAPD Air",
+   "step_hz": 25000,
+   "note": "Air Support Company 1, LAPD Hooper Heliport \u00b7 your list (airnav / RadioReference); verify on RR"
+  },
+  {
+   "name": "Hooper ASC 2",
+   "freq_hz": 122850000,
+   "mode": "AM",
+   "group": "LAPD Air",
+   "step_hz": 25000,
+   "note": "Air Support Company 2 \u00b7 your list (airnav / RadioReference); verify on RR"
+  },
+  {
+   "name": "LAPD AIR-10",
+   "freq_hz": 507162500,
+   "mode": "NFM",
+   "group": "LAPD Air",
+   "step_hz": 12500,
+   "note": "Tactical air support / overhead tracking \u00b7 NAC 466 \u00b7 your list (airnav / RadioReference); verify on RR",
+   "digital": "P25"
+  },
+  {
    "name": "2m simplex",
    "freq_hz": 146520000,
    "mode": "NFM",
