@@ -871,6 +871,102 @@
    "mode": "WFM",
    "group": "FM",
    "step_hz": 200000
+  },
+  {
+   "name": "CHP Black base",
+   "freq_hz": 42120000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Base (dispatch) \u00b7 Central LA, 15-prefix: downtown freeways \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Black mob",
+   "freq_hz": 42400000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Mobile (units) \u00b7 Central LA, 15-prefix: downtown freeways \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Teal base",
+   "freq_hz": 42360000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Base (dispatch) \u00b7 West Valley, 56-prefix: San Fernando Valley \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Teal mob",
+   "freq_hz": 42140000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Mobile (units) \u00b7 West Valley, 56-prefix: San Fernando Valley \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP White base",
+   "freq_hz": 42500000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Base (dispatch) \u00b7 South LA, 77-prefix: South LA basin + beach cities \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP White mob",
+   "freq_hz": 42260000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Mobile (units) \u00b7 South LA, 77-prefix: South LA basin + beach cities \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Pink base",
+   "freq_hz": 42420000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Base (dispatch) \u00b7 West LA, 79-prefix: Santa Monica, Culver City, Westside \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Pink mob",
+   "freq_hz": 42060000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Mobile (units) \u00b7 West LA, 79-prefix: Santa Monica, Culver City, Westside \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Tan base",
+   "freq_hz": 42460000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Base (dispatch) \u00b7 Newhall / Castaic, 78-prefix: Santa Clarita, north I-5 \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Tan mob",
+   "freq_hz": 42740000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Mobile (units) \u00b7 Newhall / Castaic, 78-prefix: Santa Clarita, north I-5 \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Gold base",
+   "freq_hz": 42340000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Base (dispatch) \u00b7 Antelope Valley, 89-prefix: Lancaster, Palmdale \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
+  },
+  {
+   "name": "CHP Gold mob",
+   "freq_hz": 42200000,
+   "mode": "NFM",
+   "group": "Highway Patrol",
+   "step_hz": 20000,
+   "note": "Mobile (units) \u00b7 Antelope Valley, 89-prefix: Lancaster, Palmdale \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
   }
  ],
  "collapsed": [
