@@ -297,6 +297,7 @@ class Images:
                 pass
         self._flags = {}                      # iso -> QPixmap, or None while loading
         self._logos = {}                      # code -> QPixmap or None (not there)
+        self._tails = {}                      # (code, height) -> generated QPixmap
 
     def flag(self, iso):
         if not iso:
@@ -344,6 +345,55 @@ class Images:
 
     def reload_logos(self):
         self._logos.clear()
+        self._tails.clear()
+
+    def tail(self, code, h=40):
+        """Original tail-fin icon: fin in the airline's palette colour + its code.
+        (Not a logo; your own files in user/logos override it.)"""
+        key = (code, h)
+        if key in self._tails:
+            return self._tails[key]
+        w = int(h * 1.6)
+        pm = QtGui.QPixmap(w, h)
+        pm.fill(QtCore.Qt.GlobalColor.transparent)
+        qp = QtGui.QPainter(pm)
+        qp.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        base = QtGui.QColor(airlines.badge_color(code))
+        fin = QtGui.QPainterPath()
+        fin.moveTo(w * 0.08, h * 0.95)
+        fin.lineTo(w * 0.42, h * 0.06)
+        fin.quadTo(w * 0.47, h * 0.0, w * 0.56, h * 0.04)
+        fin.lineTo(w * 0.70, h * 0.10)
+        fin.lineTo(w * 0.62, h * 0.95)
+        fin.closeSubpath()
+        grad = QtGui.QLinearGradient(0, 0, w * 0.6, h)
+        grad.setColorAt(0, base.lighter(135))
+        grad.setColorAt(1, base.darker(115))
+        qp.setBrush(QtGui.QBrush(grad))
+        qp.setPen(QtGui.QPen(base.darker(160), max(1.0, h / 30)))
+        qp.drawPath(fin)
+        # stabiliser stub
+        qp.setBrush(base.darker(130))
+        qp.drawRoundedRect(QtCore.QRectF(w * 0.04, h * 0.80, w * 0.66, h * 0.16), h * 0.06, h * 0.06)
+        f = QtGui.QFont("Segoe UI")
+        f.setBold(True)
+        f.setPixelSize(int(h * 0.36))
+        qp.setFont(f)
+        qp.setPen(QtGui.QColor("#ffffff"))
+        qp.drawText(QtCore.QRectF(w * 0.30, h * 0.18, w * 0.70, h * 0.5),
+                    QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter, code)
+        qp.end()
+        self._tails[key] = pm
+        return pm
+
+    def airline_icon(self, code, h=40):
+        """Your logo from user/logos if there is one, else the generated tail fin."""
+        if not code:
+            return None
+        logo = self.logo(code)
+        if logo is not None:
+            return logo.scaledToHeight(h, QtCore.Qt.TransformationMode.SmoothTransformation)
+        return self.tail(code, h)
 
 
 class InfoCard(QtWidgets.QFrame):
@@ -475,7 +525,7 @@ class AircraftTab(QtWidgets.QWidget):
         self.table.sortByColumn(col, order)
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(30)
-        self.table.setIconSize(QtCore.QSize(24, 16))
+        self.table.setIconSize(QtCore.QSize(40, 24))
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -657,15 +707,9 @@ class AircraftTab(QtWidgets.QWidget):
         name, code = flight_name(p["callsign"])
         c = self.card
         if code:
-            logo = self.images.logo(code)
-            if logo is not None:
-                c.badge.setText("")
-                c.badge.setPixmap(logo.scaledToHeight(36, QtCore.Qt.TransformationMode.SmoothTransformation))
-                c.badge.setStyleSheet("background: transparent; padding: 0;")
-            else:
-                c.badge.setPixmap(QtGui.QPixmap())
-                c.badge.setText(code)
-                c.badge.setStyleSheet(f"background:{airlines.badge_color(code)};")
+            c.badge.setText("")
+            c.badge.setPixmap(self.images.airline_icon(code, 40))
+            c.badge.setStyleSheet("background: transparent; padding: 0;")
             c.badge.show()
         else:
             c.badge.hide()
@@ -929,8 +973,7 @@ class AircraftTab(QtWidgets.QWidget):
             flight = QtWidgets.QTableWidgetItem(p["callsign"] or "—")
             flight.setFont(bold)
             if code:
-                flight.setBackground(QtGui.QColor(airlines.badge_color(code)))
-                flight.setForeground(QtGui.QColor("#ffffff"))
+                flight.setIcon(QtGui.QIcon(self.images.airline_icon(code, 40)))
             airline = QtWidgets.QTableWidgetItem(
                 name or ("Helicopter" if p["rotor"] else ("Private / other" if p["callsign"] else "")))
             airline.setForeground(QtGui.QColor("#cfd8dc" if name else "#8a9399"))
@@ -939,10 +982,7 @@ class AircraftTab(QtWidgets.QWidget):
             if fl is not None:
                 airline.setIcon(QtGui.QIcon(fl))
                 airline.setToolTip(f"Registered in {cname}")
-            logo = self.images.logo(code)
-            if logo is not None:
-                flight.setIcon(QtGui.QIcon(logo))
-                flight.setBackground(QtGui.QColor(0, 0, 0, 0))
+
             alt = _Num(f"{p['alt']:,}" if p["alt"] is not None else "", p["alt"])
             alt.setForeground(QtGui.QColor(airlines.alt_color(p["alt"])))
             hdg = _Num(f"{ARROWS[int((p['track'] + 22.5) % 360 // 45)]} {p['track']:.0f}°"

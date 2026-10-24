@@ -103,7 +103,8 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   Flags: country of registration from the ICAO address block
   (`core/icao_country.py`), images from flagcdn cached in user/cache/flags.
   Airline logos: only user-supplied files in user/logos/<ICAO code>.png
-  (never drawn or bundled by us).
+  (never drawn or bundled by us). Default: Images.tail() generates an original
+  tail-fin icon (palette colour + ICAO code), not a logo.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 
