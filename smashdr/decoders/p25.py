@@ -21,8 +21,8 @@ from pathlib import Path
 
 import numpy as np
 
-import p25_fec as pf
-from dsp import Channelizer, StreamFir, cu8_to_iq
+from smashdr.decoders import p25_fec as pf
+from smashdr.core.dsp import Channelizer, StreamFir, cu8_to_iq
 
 SYMBOL_RATE = 4800
 CHAN_RATE = 48_000

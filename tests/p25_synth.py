@@ -8,7 +8,7 @@ FM-modulated at the given IQ rate with offset, symbol-clock error and noise.
 
 import numpy as np
 
-import p25
+from smashdr.decoders import p25
 
 FRAME_DIBITS = 864            # LDU length incl. status dibits
 
@@ -60,7 +60,7 @@ def make_signal(n_frames=20, nac=0x466, rate=960_000, offset_hz=-192_000,
 # --------------------------------------------------------------------------
 # Full-frame encoders (valid FEC) for round-trip tests
 # --------------------------------------------------------------------------
-import p25_fec as pf  # noqa: E402
+from smashdr.decoders import p25_fec as pf  # noqa: E402
 
 
 def _put(bits, start, value, nbits):

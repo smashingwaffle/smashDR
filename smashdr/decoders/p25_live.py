@@ -17,8 +17,8 @@ plus, once a second while a control channel is being received,
 
 import numpy as np
 
-import p25
-from dsp import StreamFir, lowpass_taps
+from smashdr.decoders import p25
+from smashdr.core.dsp import StreamFir, lowpass_taps
 
 GAP_S = 0.6                 # silence that separates transmissions
 END_TIMEOUT_S = 1.0         # end a call if no frames arrive for this long

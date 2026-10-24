@@ -7,7 +7,7 @@ import time
 
 import numpy as np
 
-import p25
+from smashdr.decoders import p25
 from tests.p25_synth import make_signal
 
 

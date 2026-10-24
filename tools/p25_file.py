@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import p25  # noqa: E402
+from smashdr.decoders import p25  # noqa: E402
 
 
 def main():
@@ -70,7 +70,7 @@ def main():
 def write_wav(calls, path):
     import wave
     import numpy as np
-    import vocoder
+    from smashdr.core import vocoder
     try:
         dec = vocoder.ImbeDecoder()
     except OSError as e:

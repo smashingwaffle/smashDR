@@ -19,7 +19,8 @@ recordings/
 *.cu8
 *.cf32
 
-# Local settings
+# Your settings and presets (user/)
+user/
 settings.json
 settings.tmp
 

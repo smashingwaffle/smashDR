@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-HERE = Path(__file__).resolve().parent
+from smashdr.paths import LIB_DIRS
 LIB_NAMES = ["mbe-neo.dll", "libmbe-neo.so", "libmbe-neo.so.2", "libmbe-neo.dylib"]
 PARMS_BYTES = 8192            # sizeof(mbe_parms) is 2604 in 2.6.x; leave headroom
 SAMPLES_PER_FRAME = 160       # 20 ms at 8 kHz
@@ -34,7 +34,7 @@ FLAG_REPEAT = 0x0040
 
 
 def find_library(extra_dirs=()):
-    dirs = [*map(Path, extra_dirs), HERE, HERE / "lib"]
+    dirs = [*map(Path, extra_dirs), *LIB_DIRS]
     env = os.environ.get("SMASHDR_MBELIB")
     if env:
         return Path(env)

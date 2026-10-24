@@ -29,7 +29,7 @@ python main.py --freq 851.0125     # command line overrides saved settings
 ```
 
 Or press F5 in VSCode (pulls the latest code first). Settings (frequency,
-gain, rate, squelch, volume, audio device) are saved to `settings.json`
+gain, rate, squelch, volume, audio device) are saved to `user/settings.json`
 on close. Pick the audio output device on the **Settings** tab.
 
 Tuning: wheel over a digit of the frequency display to change that digit,
@@ -48,8 +48,8 @@ time it fills your secondary monitor, after that it remembers where you put it).
 Groups collapse; click a preset to tune, right-click to edit. **Import…**
 takes rows copied from a RadioReference table: select the rows (with or
 without the header), copy, paste. Clear digital channels are kept and labelled; encrypted ones are skipped.
-Your presets live in `presets.json` (not in git); new defaults added to
-`presets_default.json` merge in without undoing your deletions.
+Your presets live in `user/presets.json` (not in git); new defaults added to
+`data/presets_default.json` merge in without undoing your deletions.
 
 ## P25 (in progress)
 
@@ -57,7 +57,7 @@ Phase 1 decoding works offline on recordings: frames, talkgroup, radio ID,
 clear/encrypted, and clear voice through mbelib-neo.
 
 1. Get `mbe-neo.dll`: GitHub repo -> Releases -> "mbelib-neo for Windows"
-   (built by this repo's workflow). Put it next to `main.py`.
+   (built by this repo's workflow). Put it next to `main.py` or in `lib/`.
 2. Record a P25 channel (Record IQ, 0.96 MS/s), then:
 
 ```

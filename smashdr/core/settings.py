@@ -1,9 +1,10 @@
-"""settings.py - tiny JSON settings store (settings.json next to the app, not in git)."""
+"""settings.py - tiny JSON settings store (user/settings.json, not in git)."""
 
 import json
-from pathlib import Path
 
-PATH = Path(__file__).resolve().parent / "settings.json"
+from smashdr.paths import user_file
+
+PATH = user_file("settings.json")
 
 
 def load() -> dict:

@@ -29,29 +29,42 @@
 UX comes after the decode chain works.
 
 ## Code layout
-- `main.py` entry; `receiver.py` main window, AsyncCapture (gap-free USB
-  thread) and SdrReader (processing thread)
-- `dsp.py` block DSP with state: Channelizer (NCO + FFT overlap-save
+```
+main.py                  entry (F5); stays in the root
+smashdr/paths.py         ROOT, data/, user/, recordings/, DLL dirs (root or lib/)
+smashdr/core/            no Qt widgets: dsp, bandplan, settings, vocoder
+smashdr/ui/              PyQt6: receiver (main window), presets, widgets, audio
+smashdr/decoders/        p25, p25_fec, p25_live (DMR / Phase 2 go here later)
+data/presets_default.json  seed presets (in git)
+user/                    settings.json, presets.json (not in git; old root copies
+                         are moved here on first start)
+tests/  tools/           run from the root: python -m tests.test_p25,
+                         python -m tools.p25_file <file.cu8>
+```
+Imports are absolute (`from smashdr.core.dsp import ...`).
+- `ui/receiver.py` main window, AsyncCapture (gap-free USB thread) and
+  SdrReader (processing thread)
+- `core/dsp.py` block DSP with state: Channelizer (NCO + FFT overlap-save
   decimator), Demod (NFM/AM/WFM -> 48 kHz, gate, limiter, click-free switches)
-- `widgets.py` FreqDisplay (VFO) and LevelMeter
-- `bandplan.py` simplified US band plan, lookup() and in_span()
-- `presets.py` preset store (presets.json local, seeded from
-  presets_default.json in git) + PresetsWindow (second-screen button grid)
+- `ui/widgets.py` FreqDisplay (VFO) and LevelMeter
+- `core/bandplan.py` simplified US band plan, lookup() and in_span()
+- `ui/presets.py` preset store + PresetsWindow (second-screen window: group
+  sidebar, group colours, Pinned section, live marker)
 - Stefaan is in LA (90032); presets and examples should be LA-area, Mt Wilson
   is his main repeater site. Never seed other regions' frequencies.
-- `p25.py` P25 Phase 1: C4FMDemod (raw symbols; integrate-and-dump + Gardner,
+- `decoders/p25.py` P25 Phase 1: C4FMDemod (raw symbols; integrate-and-dump + Gardner,
   loop gain negative), P25Framer (normalised-correlation sync, per-frame
   gain/offset LS fit from the sync -> catches HDUs; NID ML BCH; collects
   whole frames), decode_frame_body (LC, ESS/ALGID, HDU, IMBE de-interleave
   formula), group_calls(), decode_recording()
-- `p25_fec.py` Hamming(10,6), Golay(24,12)/(18,6), RS over GF(64) (0x43,
+- `decoders/p25_fec.py` Hamming(10,6), Golay(24,12)/(18,6), RS over GF(64) (0x43,
   FCR 1) encode + decode. Matches the air: 0 corrections on clean frames.
-- `p25_live.py` P25Live: streaming chain + call state -> 48 kHz audio + events
+- `decoders/p25_live.py` P25Live: streaming chain + call state -> 48 kHz audio + events
   (start/update/end per call, 'cc' once a second on control channels). Voice
   held until ALGID known; encrypted never decoded. Receiver mode "P25"
   (dsp.DIGITAL_MODES), P25 presets switch to it.
 - Channelizer mixer uses a cached rotation table (was 70% of CPU)
-- `vocoder.py` mbelib-neo via ctypes (mbe-neo.dll / libmbe-neo.so,
+- `core/vocoder.py` mbelib-neo via ctypes (mbe-neo.dll / libmbe-neo.so,
   SMASHDR_MBELIB env override). imbe_fr[8][23], MSB at index 22.
 - `.github/workflows/build-mbelib-neo.yml` builds mbe-neo.dll on a Windows
   runner from a pinned commit -> release 'mbelib-neo-win64'.
@@ -61,8 +74,8 @@ UX comes after the decode chain works.
   group_calls(); never pass encrypted IMBE to the vocoder.
 - `tests/` synthetic C4FM generator (standard tx filter) + `python -m tests.test_p25`
 - `tools/p25_file.py` frame report for a .cu8 recording
-- `audio.py` QtMultimedia output, converts to device's preferred format
-- `settings.py` settings.json store (not in git)
+- `ui/audio.py` QtMultimedia output, converts to device's preferred format
+- `core/settings.py` user/settings.json store (not in git)
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 

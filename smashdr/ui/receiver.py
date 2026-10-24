@@ -29,12 +29,14 @@ from pathlib import Path
 
 import numpy as np
 
-import bandplan
-import settings as cfg
-from dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
+from smashdr.core import bandplan
+from smashdr.core import settings as cfg
+from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
-HERE = Path(__file__).resolve().parent
-VERSION = "0.2.5"
+from smashdr.paths import RECORDINGS, ROOT  # noqa: E402
+
+HERE = ROOT
+VERSION = "0.2.6"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -120,13 +122,13 @@ except Exception as e:  # missing DLL shows up as ImportError/OSError
 from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: E402
 import pyqtgraph as pg  # noqa: E402
 
-from widgets import FreqDisplay, LevelMeter  # noqa: E402
-from presets import PresetsWindow, load_presets  # noqa: E402
-from p25_live import P25Live  # noqa: E402
-import p25 as p25mod  # noqa: E402
+from smashdr.ui.widgets import FreqDisplay, LevelMeter  # noqa: E402
+from smashdr.ui.presets import PresetsWindow, load_presets  # noqa: E402
+from smashdr.decoders.p25_live import P25Live  # noqa: E402
+from smashdr.decoders import p25 as p25mod  # noqa: E402
 
 try:
-    import audio  # noqa: E402
+    from smashdr.ui import audio  # noqa: E402
 except Exception as e:  # QtMultimedia missing
     print("[!] Audio disabled, QtMultimedia not available:", e)
     audio = None
@@ -319,7 +321,7 @@ class SdrReader(QtCore.QThread):
         if self._vocoder_failed:
             return None
         try:
-            import vocoder
+            from smashdr.core import vocoder
             return vocoder.ImbeDecoder()
         except OSError as e:
             self._vocoder_failed = True
@@ -327,7 +329,7 @@ class SdrReader(QtCore.QThread):
             return None
 
     def _open_recording(self, meta: dict):
-        rec_dir = Path(meta.pop("dir", None) or (HERE / "recordings"))
+        rec_dir = Path(meta.pop("dir", None) or (RECORDINGS))
         try:
             rec_dir.mkdir(parents=True, exist_ok=True)
         except OSError as e:
@@ -832,7 +834,7 @@ class MainWindow(QtWidgets.QMainWindow):
         df.addRow("Preset tags", self.tags_chk)
 
         # --- Recording ---
-        self.rec_dir_edit = QtWidgets.QLineEdit(opts["rec_dir"] or str(HERE / "recordings"))
+        self.rec_dir_edit = QtWidgets.QLineEdit(opts["rec_dir"] or str(RECORDINGS))
         browse = QtWidgets.QPushButton("Browse…")
         browse.clicked.connect(self._browse_rec_dir)
         rec_row = QtWidgets.QHBoxLayout()

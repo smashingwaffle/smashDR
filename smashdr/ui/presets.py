@@ -25,9 +25,10 @@ from pathlib import Path
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-HERE = Path(__file__).resolve().parent
-STORE = HERE / "presets.json"
-DEFAULT_STORE = HERE / "presets_default.json"
+from smashdr.paths import DATA, user_file
+
+STORE = user_file("presets.json")
+DEFAULT_STORE = DATA / "presets_default.json"
 MODE_NAMES = ["NFM", "AM", "WFM"]
 # preset button sizes: (width, height, font pt)
 BUTTON_SIZES = {"Small": (140, 50, 9), "Medium": (180, 60, 10), "Large": (220, 72, 12)}
