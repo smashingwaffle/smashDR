@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.4.6"
+VERSION = "0.4.7"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -201,6 +201,8 @@ class SdrReader(QtCore.QThread):
         self._an_last = 0.0
         self._call_meta = None
         self.transcriber = None
+        self.stt_on = bool(opts.get("stt_on", True))          # set from the UI thread
+        self.stt_skip_am = bool(opts.get("stt_skip_am", True))
         if transcribe.available():
             self.transcriber = transcribe.Transcriber(self.transcript.emit,
                                                       opts.get("stt_model", transcribe.DEFAULT_MODEL))
@@ -280,7 +282,8 @@ class SdrReader(QtCore.QThread):
 
     def _track_call(self, ev):
         """Collect each call's audio; hand clear calls to the transcriber when they end."""
-        if self.transcriber is None or ev["type"] == "cc":
+        if self.transcriber is None or ev["type"] == "cc" or not self.stt_on:
+            self._call_pcm = self._call_meta = None
             return
         if ev["type"] == "start":
             self._call_pcm, self._call_meta = [], dict(ev)
@@ -294,7 +297,8 @@ class SdrReader(QtCore.QThread):
 
     def _track_analog(self, pcm, sq_open):
         """Analog NFM/AM: a transmission = squelch open until it stays shut for ANALOG_HANG_S."""
-        if self.transcriber is None or self.mode not in ("NFM", "AM") or self.squelch_db <= 0:
+        if (self.transcriber is None or not self.stt_on or self.mode not in ("NFM", "AM")
+                or self.squelch_db <= 0 or (self.mode == "AM" and self.stt_skip_am)):
             self._an_pcm = None
             return
         now = time.time()
@@ -720,7 +724,19 @@ class MainWindow(QtWidgets.QMainWindow):
         tx_clear.setText("Clear")
         tx_clear.clicked.connect(self.tx_view.clear)
         tx_head = QtWidgets.QHBoxLayout()
+        self.stt_chk = QtWidgets.QCheckBox("On")
+        self.stt_chk.setToolTip("Transcribe calls (off = nothing is sent to Whisper)")
+        self.stt_chk.setChecked(bool(self.opts.get("stt_on", True)))
+        self.stt_am_chk = QtWidgets.QCheckBox("Skip AM (air)")
+        self.stt_am_chk.setToolTip("Don't transcribe AM, i.e. aviation; P25 and NFM keep going")
+        self.stt_am_chk.setChecked(bool(self.opts.get("stt_skip_am", True)))
+        self.stt_am_chk.setEnabled(self.stt_chk.isChecked())
+        self.stt_chk.toggled.connect(self._stt_toggled)
+        self.stt_am_chk.toggled.connect(self._stt_toggled)
         tx_head.addWidget(tx_title)
+        tx_head.addSpacing(10)
+        tx_head.addWidget(self.stt_chk)
+        tx_head.addWidget(self.stt_am_chk)
         tx_head.addStretch(1)
         tx_head.addWidget(tx_clear)
         tx_panel = QtWidgets.QWidget()
@@ -1101,6 +1117,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.opts["carto_key"] = key
             self.aircraft_tab.reload_map()
             self.status_lbl.setText("Map key " + ("saved, map reloaded" if key else "cleared"))
+
+    def _stt_toggled(self, _on=None):
+        self.reader.stt_on = self.stt_chk.isChecked()
+        self.reader.stt_skip_am = self.stt_am_chk.isChecked()
+        self.stt_am_chk.setEnabled(self.stt_chk.isChecked())
+        self.opts["stt_on"] = self.stt_chk.isChecked()
+        self.opts["stt_skip_am"] = self.stt_am_chk.isChecked()
 
     def _set_stt_model(self, _i):
         name = self.stt_box.currentData()
@@ -1562,6 +1585,8 @@ class MainWindow(QtWidgets.QMainWindow):
             preset_tags=self.tags_chk.isChecked(),
             rec_dir=self.rec_dir_edit.text().strip(),
             stt_model=self.stt_box.currentData(),
+            stt_on=self.stt_chk.isChecked(),
+            stt_skip_am=self.stt_am_chk.isChecked(),
             carto_key=self.carto_edit.text().strip(),
             aeroapi_key=self.fa_edit.text().strip(),
             aeroapi_cap=self.fa_cap.value(),
