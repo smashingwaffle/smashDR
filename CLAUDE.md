@@ -33,8 +33,8 @@ UX comes after the decode chain works.
 main.py                  entry (F5); stays in the root
 smashdr/paths.py         ROOT, data/, user/, recordings/, DLL dirs (root or lib/)
 smashdr/core/            no Qt widgets: dsp, bandplan, settings, vocoder, transcribe
-smashdr/ui/              PyQt6: receiver (main window), presets, widgets, audio
-smashdr/decoders/        p25, p25_fec, p25_live (DMR / Phase 2 go here later)
+smashdr/ui/              PyQt6: receiver (main window), presets, widgets, audio, aircraft
+smashdr/decoders/        p25, p25_fec, p25_live, adsb (DMR / Phase 2 go here later)
 data/presets_default.json  seed presets (in git)
 user/                    settings.json, presets.json (not in git; old root copies
                          are moved here on first start)
@@ -84,6 +84,11 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   Stefaan's CA list; `lapd: true` entries override (LAPD Code 6 = out to investigate).
 - `core/places.py` + `data/streets.json`: addresses / streets / intersections in
   transcripts become Google Maps links (", Los Angeles, CA" appended).
+- Aircraft tab: second RTL-SDR V4 on a 1090 MHz antenna. `decoders/adsb.py`
+  (2 MS/s PPM demod, vectorised preamble + CRC-24, DF17/18, CPR local decode vs
+  last fix/home, Tracker) + `ui/aircraft.py` (AdsbReader thread, table, Leaflet
+  map via optional PyQt6-WebEngine). `core/capture.py` AsyncCapture shared.
+  Tests: `python -m tests.test_adsb` (1090 Riddle vectors + synthetic PPM).
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 

@@ -5,3 +5,4 @@ setuptools<81   # older pyrtlsdr may import pkg_resources
 pyqtgraph
 PyQt6
 faster-whisper  # optional: speech-to-text of clear P25 calls
+PyQt6-WebEngine  # optional: map on the Aircraft tab

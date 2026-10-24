@@ -33,12 +33,13 @@ import numpy as np
 from smashdr.core import bandplan
 from smashdr.core import settings as cfg
 from smashdr.core import codes, places, transcribe
+from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.3.6"
+VERSION = "0.4.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -128,6 +129,7 @@ import pyqtgraph as pg  # noqa: E402
 
 from smashdr.ui.widgets import FreqDisplay, LevelMeter  # noqa: E402
 from smashdr.ui.presets import PresetsWindow, load_presets  # noqa: E402
+from smashdr.ui.aircraft import AircraftTab  # noqa: E402  (before QApplication: WebEngine)
 from smashdr.decoders.p25_live import P25Live  # noqa: E402
 from smashdr.decoders import p25 as p25mod  # noqa: E402
 
@@ -158,44 +160,6 @@ def list_devices() -> list:
 # --------------------------------------------------------------------------
 # USB capture (async, gap-free)
 # --------------------------------------------------------------------------
-class AsyncCapture(threading.Thread):
-    """
-    Streams from librtlsdr with rtlsdr_read_async and does nothing but copy
-    each USB block into a queue. Blocking read_bytes() in the processing loop
-    lost samples between calls (clicks every few blocks); this doesn't.
-    """
-
-    def __init__(self, sdr, nbytes: int, q: queue.Queue):
-        super().__init__(name="rtlsdr-capture", daemon=True)
-        self.sdr = sdr
-        self.nbytes = nbytes
-        self.q = q
-        self.dropped = 0      # blocks thrown away because processing fell behind
-        self.error = None
-
-    def _cb(self, buf, _ctx):
-        try:
-            data = np.frombuffer(buf, dtype=np.uint8).tobytes()
-        except TypeError:
-            data = bytes(bytearray(buf))
-        try:
-            self.q.put_nowait(data)
-        except queue.Full:
-            self.dropped += 1
-
-    def run(self):
-        try:
-            self.sdr.read_bytes_async(self._cb, self.nbytes)
-        except Exception as e:
-            self.error = e
-
-    def stop(self):
-        try:
-            self.sdr.cancel_read_async()
-        except Exception:
-            pass
-
-
 # --------------------------------------------------------------------------
 # SDR processing thread
 # --------------------------------------------------------------------------
@@ -573,6 +537,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         tabs = QtWidgets.QTabWidget()
         tabs.addTab(self._build_receiver_tab(), "Receiver")
+        self.aircraft_tab = AircraftTab(opts, list_devices(),
+                                        int(opts.get("_opened_device", opts["device_index"])))
+        tabs.addTab(self.aircraft_tab, "Aircraft")
         tabs.addTab(self._build_settings_tab(), "Settings")
         self.setCentralWidget(tabs)
 
@@ -1490,6 +1457,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Shutdown
     # ======================================================================
     def closeEvent(self, ev):
+        self.aircraft_tab.stop()
         self.opts["main_geometry"] = bytes(self.saveGeometry().toHex()).decode()
         if self.presets_win is not None:
             self.opts["presets_open"] = self.presets_win.isVisible()
