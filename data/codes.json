@@ -1,0 +1,1247 @@
+{
+ "note": "Code glossary for transcript annotations. Generic CA list from Stefaan; entries with lapd=true are LAPD usage and override the generic meaning.",
+ "codes": {
+  "10-1": {
+   "m": "Poor reception",
+   "kind": "radio"
+  },
+  "10-10": {
+   "m": "Off duty.",
+   "kind": "radio"
+  },
+  "10-100": {
+   "m": "Civil disturbance - Mutual aid standby.",
+   "kind": "radio"
+  },
+  "10-101": {
+   "m": "Civil disturbance - Mutual aid request.",
+   "kind": "radio"
+  },
+  "10-10A": {
+   "m": "Off duty at home.",
+   "kind": "radio"
+  },
+  "10-11": {
+   "m": "Identify this frequency.",
+   "kind": "radio"
+  },
+  "10-12": {
+   "m": "Visitors are present (be discrete).",
+   "kind": "radio"
+  },
+  "10-13": {
+   "m": "Advise weather and road conditions.",
+   "kind": "radio"
+  },
+  "10-14": {
+   "m": "Citizen holding suspect.",
+   "kind": "radio"
+  },
+  "10-15": {
+   "m": "Prisoner in custody.",
+   "kind": "radio"
+  },
+  "10-16": {
+   "m": "Pick up prisoner.",
+   "kind": "radio"
+  },
+  "10-17": {
+   "m": "Request for gasoline.",
+   "kind": "radio"
+  },
+  "10-18": {
+   "m": "Equipment exchange.",
+   "kind": "radio"
+  },
+  "10-19": {
+   "m": "Return/returning to the station.",
+   "kind": "radio"
+  },
+  "10-2": {
+   "m": "Good reception",
+   "kind": "radio"
+  },
+  "10-20": {
+   "m": "Location?",
+   "kind": "radio"
+  },
+  "10-21": {
+   "m": "Telephone:______",
+   "kind": "radio"
+  },
+  "10-21a": {
+   "m": "Advise home that I will return at ______.",
+   "kind": "radio"
+  },
+  "10-21b": {
+   "m": "Phone your home",
+   "kind": "radio"
+  },
+  "10-21r": {
+   "m": "Phone radio dispatch",
+   "kind": "radio"
+  },
+  "10-22": {
+   "m": "Disregard the last assignment.",
+   "kind": "radio"
+  },
+  "10-22c": {
+   "m": "Leave area if all secure.",
+   "kind": "radio"
+  },
+  "10-23": {
+   "m": "Standby.",
+   "kind": "radio"
+  },
+  "10-24": {
+   "m": "Request car-to-car transmission.",
+   "kind": "radio"
+  },
+  "10-25": {
+   "m": "Do you have contact with _______?",
+   "kind": "radio"
+  },
+  "10-26": {
+   "m": "Clear.",
+   "kind": "radio"
+  },
+  "10-27": {
+   "m": "Driver's license check.",
+   "kind": "radio"
+  },
+  "10-28": {
+   "m": "Vehicle registration request.",
+   "kind": "radio"
+  },
+  "10-29": {
+   "m": "Check wants/warrants.[vehicle] (PIN,SVS)",
+   "kind": "radio"
+  },
+  "10-29a": {
+   "m": "Check wants/warrants [subject] (PIN)",
+   "kind": "radio"
+  },
+  "10-29c": {
+   "m": "Check complete [subject]",
+   "kind": "radio"
+  },
+  "10-29f": {
+   "m": "The subject is wanted for a felony.",
+   "kind": "radio"
+  },
+  "10-29h": {
+   "m": "Caution - severe hazard potential.",
+   "kind": "radio"
+  },
+  "10-29m": {
+   "m": "The subject is wanted for a misdemeanor.",
+   "kind": "radio"
+  },
+  "10-29r": {
+   "m": "Check wants/record [subject PIN,CJIC)",
+   "kind": "radio"
+  },
+  "10-29v": {
+   "m": "The vehicle wanted in connection W/crime.",
+   "kind": "radio"
+  },
+  "10-30": {
+   "m": "Does not conform to regulations.",
+   "kind": "radio"
+  },
+  "10-32": {
+   "m": "Drowning.",
+   "kind": "radio"
+  },
+  "10-33": {
+   "m": "Alarm sounding.",
+   "kind": "radio"
+  },
+  "10-34": {
+   "m": "Assist at office.",
+   "kind": "radio"
+  },
+  "10-35": {
+   "m": "Time check.",
+   "kind": "radio"
+  },
+  "10-36": {
+   "m": "Confidential information.",
+   "kind": "radio"
+  },
+  "10-37": {
+   "m": "Identify the operator.",
+   "kind": "radio"
+  },
+  "10-39": {
+   "m": "Can ______ come to the radio?",
+   "kind": "radio"
+  },
+  "10-4": {
+   "m": "Acknowledged / OK",
+   "kind": "radio"
+  },
+  "10-40": {
+   "m": "Is ______ available for a telephone call?",
+   "kind": "radio"
+  },
+  "10-42": {
+   "m": "Check on the welfare of/at ______.",
+   "kind": "radio"
+  },
+  "10-43": {
+   "m": "Call a doctor.",
+   "kind": "radio"
+  },
+  "10-45": {
+   "m": "What is the condition of the patient?",
+   "kind": "radio"
+  },
+  "10-45A": {
+   "m": "Condition of patient is good.",
+   "kind": "radio"
+  },
+  "10-45B": {
+   "m": "Condition of patient is serious.",
+   "kind": "radio"
+  },
+  "10-45C": {
+   "m": "Condition of patient is critical.",
+   "kind": "radio"
+  },
+  "10-45D": {
+   "m": "Patient is deceased.",
+   "kind": "radio"
+  },
+  "10-46": {
+   "m": "Sick person [ambulance enroute]",
+   "kind": "radio"
+  },
+  "10-48": {
+   "m": "Ambulance transfer call",
+   "kind": "radio"
+  },
+  "10-49": {
+   "m": "Proceed to/Enroute to ______.",
+   "kind": "radio"
+  },
+  "10-5": {
+   "m": "Relay",
+   "kind": "radio"
+  },
+  "10-50": {
+   "m": "under influence of narcotics/Take a report.",
+   "kind": "radio"
+  },
+  "10-51": {
+   "m": "Subject is drunk.",
+   "kind": "radio"
+  },
+  "10-52": {
+   "m": "Resuscitator is needed.",
+   "kind": "radio"
+  },
+  "10-53": {
+   "m": "Person down.",
+   "kind": "radio"
+  },
+  "10-54": {
+   "m": "Possible dead body.",
+   "kind": "radio"
+  },
+  "10-55": {
+   "m": "Coroner's case.",
+   "kind": "radio"
+  },
+  "10-56": {
+   "m": "Suicide.",
+   "kind": "radio"
+  },
+  "10-56A": {
+   "m": "Suicide attempt.",
+   "kind": "radio"
+  },
+  "10-57": {
+   "m": "Firearm discharged.",
+   "kind": "radio"
+  },
+  "10-58": {
+   "m": "Garbage complaint",
+   "kind": "radio"
+  },
+  "10-59": {
+   "m": "Security check./Malicious mischief",
+   "kind": "radio"
+  },
+  "10-6": {
+   "m": "Busy",
+   "kind": "radio"
+  },
+  "10-60": {
+   "m": "Lock out.",
+   "kind": "radio"
+  },
+  "10-61": {
+   "m": "Miscellaneous public service.",
+   "kind": "radio"
+  },
+  "10-62": {
+   "m": "Meet a citizen.",
+   "kind": "radio"
+  },
+  "10-62A": {
+   "m": "Take a report from a citizen.",
+   "kind": "radio"
+  },
+  "10-62B": {
+   "m": "Civil standby.",
+   "kind": "radio"
+  },
+  "10-63": {
+   "m": "Prepare to copy.",
+   "kind": "radio"
+  },
+  "10-64": {
+   "m": "Found property.",
+   "kind": "radio"
+  },
+  "10-65": {
+   "m": "Missing person",
+   "kind": "radio"
+  },
+  "10-66": {
+   "m": "Suspicious person.",
+   "kind": "radio"
+  },
+  "10-67": {
+   "m": "Person calling for help.",
+   "kind": "radio"
+  },
+  "10-68": {
+   "m": "Call for police made via telephone.",
+   "kind": "radio"
+  },
+  "10-7": {
+   "m": "Out of service",
+   "kind": "radio"
+  },
+  "10-70": {
+   "m": "Prowler.",
+   "kind": "radio"
+  },
+  "10-71": {
+   "m": "Shooting.",
+   "kind": "radio"
+  },
+  "10-72": {
+   "m": "Knifing.",
+   "kind": "radio"
+  },
+  "10-73": {
+   "m": "How do you receive?",
+   "kind": "radio"
+  },
+  "10-79": {
+   "m": "Bomb threat.",
+   "kind": "radio"
+  },
+  "10-7A": {
+   "m": "Out of service at home.",
+   "kind": "radio"
+  },
+  "10-7B": {
+   "m": "Out of service - personal.",
+   "kind": "radio"
+  },
+  "10-8": {
+   "m": "In service/available for assignment.",
+   "kind": "radio"
+  },
+  "10-80": {
+   "m": "Explosion.",
+   "kind": "radio"
+  },
+  "10-86": {
+   "m": "Any traffic?",
+   "kind": "radio"
+  },
+  "10-87": {
+   "m": "Meet the officer at ______.",
+   "kind": "radio"
+  },
+  "10-88": {
+   "m": "Fill with the officer/Assume your post.",
+   "kind": "radio"
+  },
+  "10-9": {
+   "m": "Repeat last transmission.",
+   "kind": "radio"
+  },
+  "10-91": {
+   "m": "Animal.",
+   "kind": "radio"
+  },
+  "10-91L": {
+   "m": "Leash law violation.",
+   "kind": "radio"
+  },
+  "10-91V": {
+   "m": "Vicious animal.",
+   "kind": "radio"
+  },
+  "10-91a": {
+   "m": "Stray.",
+   "kind": "radio"
+  },
+  "10-91b": {
+   "m": "Noisy animal.",
+   "kind": "radio"
+  },
+  "10-91c": {
+   "m": "Injured animal.",
+   "kind": "radio"
+  },
+  "10-91d": {
+   "m": "Dead animal.",
+   "kind": "radio"
+  },
+  "10-91e": {
+   "m": "Animal bite.",
+   "kind": "radio"
+  },
+  "10-91g": {
+   "m": "Animal pickup.",
+   "kind": "radio"
+  },
+  "10-91h": {
+   "m": "Stray horse",
+   "kind": "radio"
+  },
+  "10-91j": {
+   "m": "Pickup/collect ______.",
+   "kind": "radio"
+  },
+  "10-95": {
+   "m": "pedestrian/ Requesting an I.D./Techunit.",
+   "kind": "radio"
+  },
+  "10-96": {
+   "m": "Out of vehicle-ped. send backup",
+   "kind": "radio"
+  },
+  "10-97": {
+   "m": "Arrived at the scene.",
+   "kind": "radio"
+  },
+  "10-98": {
+   "m": "Available for assignment.",
+   "kind": "radio"
+  },
+  "10-99": {
+   "m": "Open police garage door.",
+   "kind": "radio"
+  },
+  "1000": {
+   "m": "Plane crash",
+   "kind": "radio"
+  },
+  "102": {
+   "m": "Take or destroy property in custody of officer",
+   "kind": "PC"
+  },
+  "10851": {
+   "m": "Auto theft",
+   "kind": "VC"
+  },
+  "10852": {
+   "m": "Malicious mischief to a vehicle",
+   "kind": "VC"
+  },
+  "11-10": {
+   "m": "Take a report.",
+   "kind": "radio"
+  },
+  "11-24": {
+   "m": "Abandoned automobile.",
+   "kind": "radio"
+  },
+  "11-25": {
+   "m": "Traffic hazard.",
+   "kind": "radio"
+  },
+  "11-26": {
+   "m": "Abandoned bicycle.",
+   "kind": "radio"
+  },
+  "11-27": {
+   "m": "10-27 with the driver being held.",
+   "kind": "radio"
+  },
+  "11-28": {
+   "m": "10-28 with the driver being held.",
+   "kind": "radio"
+  },
+  "11-40": {
+   "m": "Advise if an ambulance is needed.",
+   "kind": "radio"
+  },
+  "11-41": {
+   "m": "An ambulance is needed.",
+   "kind": "radio"
+  },
+  "11-42": {
+   "m": "No ambulance is needed.",
+   "kind": "radio"
+  },
+  "11-48": {
+   "m": "Furnish transportation.",
+   "kind": "radio"
+  },
+  "11-51": {
+   "m": "Escort.",
+   "kind": "radio"
+  },
+  "11-52": {
+   "m": "Funeral detail.",
+   "kind": "radio"
+  },
+  "11-54": {
+   "m": "Suspicious vehicle.",
+   "kind": "radio"
+  },
+  "11-55": {
+   "m": "Officer is being followed by automobile.",
+   "kind": "radio"
+  },
+  "11-56": {
+   "m": "Officer is being followed by auto containing dangerous persons.",
+   "kind": "radio"
+  },
+  "11-57": {
+   "m": "An unidentified auto appeared at the scene of the assignment.",
+   "kind": "radio"
+  },
+  "11-58": {
+   "m": "Radio traffic is being monitored. Phone all non-routine messages.",
+   "kind": "radio"
+  },
+  "11-59": {
+   "m": "Give intensive attention to high hazard/business areas.",
+   "kind": "radio"
+  },
+  "11-60": {
+   "m": "Attack in a high hazard area.",
+   "kind": "radio"
+  },
+  "11-65": {
+   "m": "Signal light is out.",
+   "kind": "radio"
+  },
+  "11-66": {
+   "m": "Defective traffic light.",
+   "kind": "radio"
+  },
+  "11-71": {
+   "m": "Fire.",
+   "kind": "radio"
+  },
+  "11-78": {
+   "m": "Aircraft accident.",
+   "kind": "radio"
+  },
+  "11-79": {
+   "m": "Accident - ambulance has been sent.",
+   "kind": "radio"
+  },
+  "11-80": {
+   "m": "Accident - major injuries.",
+   "kind": "radio"
+  },
+  "11-81": {
+   "m": "Accident - minor injuries.",
+   "kind": "radio"
+  },
+  "11-82": {
+   "m": "Accident - no injuries.",
+   "kind": "radio"
+  },
+  "11-83": {
+   "m": "Accident - no details.",
+   "kind": "radio"
+  },
+  "11-84": {
+   "m": "Direct traffic.",
+   "kind": "radio"
+  },
+  "11-85": {
+   "m": "Tow truck required.",
+   "kind": "radio"
+  },
+  "11-94": {
+   "m": "Pedestrian stop.",
+   "kind": "radio"
+  },
+  "11-95": {
+   "m": "Routine traffic stop.",
+   "kind": "radio"
+  },
+  "11-96": {
+   "m": "Checking a suspicious vehicle.",
+   "kind": "radio"
+  },
+  "11-97": {
+   "m": "Time/security check on patrol vehicles.",
+   "kind": "radio"
+  },
+  "11-98": {
+   "m": "Meet: _______",
+   "kind": "radio"
+  },
+  "11-99": {
+   "m": "Officer needs help.",
+   "kind": "radio"
+  },
+  "11350": {
+   "m": "Possession",
+   "kind": "HS"
+  },
+  "11351": {
+   "m": "Possession for sales",
+   "kind": "HS"
+  },
+  "11352": {
+   "m": "Sale/transportation",
+   "kind": "HS"
+  },
+  "11357a": {
+   "m": "Possession of hashish",
+   "kind": "HS"
+  },
+  "11357b": {
+   "m": "Possession of less than 1 ounce",
+   "kind": "HS"
+  },
+  "11357c": {
+   "m": "Possession of more than 1 ounce",
+   "kind": "HS"
+  },
+  "11358": {
+   "m": "Cultivation",
+   "kind": "HS"
+  },
+  "11359": {
+   "m": "Possession for sales",
+   "kind": "HS"
+  },
+  "11360a": {
+   "m": "Sale/transportation",
+   "kind": "HS"
+  },
+  "11364": {
+   "m": "Paraphernalia",
+   "kind": "HS"
+  },
+  "11368": {
+   "m": "Forged prescription",
+   "kind": "HS"
+  },
+  "11377": {
+   "m": "Possession",
+   "kind": "HS"
+  },
+  "11378": {
+   "m": "Possession for sale",
+   "kind": "HS"
+  },
+  "11550": {
+   "m": "Under influence of a controlled substance",
+   "kind": "HS"
+  },
+  "118": {
+   "m": "Perjury",
+   "kind": "PC"
+  },
+  "12020": {
+   "m": "Possession of a deadly weapon",
+   "kind": "PC"
+  },
+  "12025": {
+   "m": "Possession of a concealed firearm",
+   "kind": "PC"
+  },
+  "12031": {
+   "m": "Possession of a loaded firearm",
+   "kind": "PC"
+  },
+  "12677": {
+   "m": "Fireworks",
+   "kind": "HS"
+  },
+  "136.1(C1)": {
+   "m": "Intimidation of witness or victim by force/threat of violence",
+   "kind": "PC"
+  },
+  "136.1(a)": {
+   "m": "Intimidation of witness or victim from attending/testifying at any trial",
+   "kind": "PC"
+  },
+  "136.1(b1)": {
+   "m": "Intimidation of witness or victim from reporting crime to police/other authorities",
+   "kind": "PC"
+  },
+  "137(a)": {
+   "m": "Offer bribe to influence testimony",
+   "kind": "PC"
+  },
+  "146a": {
+   "m": "Impersonating a peace officer",
+   "kind": "PC"
+  },
+  "148": {
+   "m": "Interfering with an officer",
+   "kind": "PC"
+  },
+  "148.1": {
+   "m": "False report of a bomb",
+   "kind": "PC"
+  },
+  "148.5": {
+   "m": "False report of a crime",
+   "kind": "PC"
+  },
+  "150": {
+   "m": "Refuse to aid an officer",
+   "kind": "PC"
+  },
+  "151(a1)": {
+   "m": "Advocate killing/injuring officer",
+   "kind": "PC"
+  },
+  "187": {
+   "m": "Murder",
+   "kind": "PC"
+  },
+  "192.1": {
+   "m": "Voluntary manslaughter",
+   "kind": "PC"
+  },
+  "192.2": {
+   "m": "Involuntary manslaughter",
+   "kind": "PC"
+  },
+  "192.3": {
+   "m": "Vehicular manslaughter",
+   "kind": "PC"
+  },
+  "20001": {
+   "m": "Hit and run - injury or death",
+   "kind": "VC"
+  },
+  "20002": {
+   "m": "Hit and run - property damage",
+   "kind": "VC"
+  },
+  "203": {
+   "m": "Mayhem",
+   "kind": "PC"
+  },
+  "207": {
+   "m": "Kidnap",
+   "kind": "PC"
+  },
+  "209a": {
+   "m": "Kidnaping for ransom/extortion",
+   "kind": "PC"
+  },
+  "209b": {
+   "m": "Kidnaping for robbery",
+   "kind": "PC"
+  },
+  "211": {
+   "m": "Robbery",
+   "kind": "PC"
+  },
+  "21111": {
+   "m": "Throwing article",
+   "kind": "VC"
+  },
+  "220": {
+   "m": "Assault with intent to mayhem/rape/sodomy/oral copulation",
+   "kind": "PC"
+  },
+  "22348": {
+   "m": "Maximum speed law - 55 MPH",
+   "kind": "VC"
+  },
+  "22350": {
+   "m": "Basic speed law - unsafe speed",
+   "kind": "VC"
+  },
+  "22500e": {
+   "m": "Vehicle blocking a driveway",
+   "kind": "VC"
+  },
+  "23109": {
+   "m": "Exhibition of speed",
+   "kind": "VC"
+  },
+  "23110": {
+   "m": "Throwing articles at a vehicle",
+   "kind": "VC"
+  },
+  "23112": {
+   "m": "Throwing garbage on highway",
+   "kind": "VC"
+  },
+  "23152": {
+   "m": "Drunk driving",
+   "kind": "VC"
+  },
+  "236": {
+   "m": "False imprisonment",
+   "kind": "PC"
+  },
+  "240": {
+   "m": "Assault",
+   "kind": "PC"
+  },
+  "240-242": {
+   "m": "Assault and Battery",
+   "kind": "PC"
+  },
+  "241": {
+   "m": "Assault on peace officer/EMT/firefighter",
+   "kind": "PC"
+  },
+  "242": {
+   "m": "Battery",
+   "kind": "PC"
+  },
+  "243a": {
+   "m": "Battery against a citizen",
+   "kind": "PC"
+  },
+  "243b": {
+   "m": "Battery against a peace officer",
+   "kind": "PC"
+  },
+  "244": {
+   "m": "Throwing acid with intent to disfigure or burn",
+   "kind": "PC"
+  },
+  "245": {
+   "m": "Assault with a deadly weapon",
+   "kind": "PC"
+  },
+  "245b": {
+   "m": "Assault with a deadly weapon against a peace officer",
+   "kind": "PC"
+  },
+  "246": {
+   "m": "Shooting at an inhabited dwelling or vehicle",
+   "kind": "PC"
+  },
+  "261": {
+   "m": "Rape",
+   "kind": "PC"
+  },
+  "261.5": {
+   "m": "Rape - under 18 years of age",
+   "kind": "PC"
+  },
+  "262": {
+   "m": "Rape of spouse",
+   "kind": "PC"
+  },
+  "266h": {
+   "m": "Pimping",
+   "kind": "PC"
+  },
+  "266i": {
+   "m": "Pandering",
+   "kind": "PC"
+  },
+  "270": {
+   "m": "Child neglect/failing to pay the support payments",
+   "kind": "PC"
+  },
+  "271": {
+   "m": "Child abandonment - under 14",
+   "kind": "PC"
+  },
+  "272": {
+   "m": "Contributing to the delinquency of a minor",
+   "kind": "PC"
+  },
+  "273.5a": {
+   "m": "Corporal injury to spouse/cohabitant",
+   "kind": "PC"
+  },
+  "273d": {
+   "m": "Corporal injury upon child",
+   "kind": "PC"
+  },
+  "278": {
+   "m": "Child abduction from parent or guardian",
+   "kind": "PC"
+  },
+  "285": {
+   "m": "Incest",
+   "kind": "PC"
+  },
+  "286": {
+   "m": "Sodomy",
+   "kind": "PC"
+  },
+  "288": {
+   "m": "Sex crimes against children",
+   "kind": "PC"
+  },
+  "288a": {
+   "m": "Oral copulation",
+   "kind": "PC"
+  },
+  "290": {
+   "m": "Sex registration",
+   "kind": "PC"
+  },
+  "3000": {
+   "m": "Road block",
+   "kind": "radio"
+  },
+  "311.2a": {
+   "m": "Possession of obscene matter",
+   "kind": "PC"
+  },
+  "311.2b": {
+   "m": "Possessing obscene matter depicting a minor",
+   "kind": "PC"
+  },
+  "314": {
+   "m": "Indecent exposure",
+   "kind": "PC"
+  },
+  "32": {
+   "m": "Accessory to a felony",
+   "kind": "PC"
+  },
+  "330": {
+   "m": "Gambling",
+   "kind": "PC"
+  },
+  "373": {
+   "m": "Public nuisance misdemeanors (spitting in public places, etc.)",
+   "kind": "PC"
+  },
+  "374b": {
+   "m": "Garbage dumping",
+   "kind": "PC"
+  },
+  "402b": {
+   "m": "Abandoned refrigerator",
+   "kind": "PC"
+  },
+  "415": {
+   "m": "Disturbing the peace (be specific)",
+   "kind": "PC"
+  },
+  "417": {
+   "m": "Brandishing a weapon",
+   "kind": "PC"
+  },
+  "451": {
+   "m": "Arson",
+   "kind": "PC"
+  },
+  "4532": {
+   "m": "Escape (also 32 PC)",
+   "kind": "PC"
+  },
+  "459": {
+   "m": "Burglary",
+   "kind": "PC"
+  },
+  "4601": {
+   "m": "Suspended or revoked license",
+   "kind": "VC"
+  },
+  "470": {
+   "m": "Forgery",
+   "kind": "PC"
+  },
+  "476a": {
+   "m": "Insufficient funds (checks)",
+   "kind": "PC"
+  },
+  "484e": {
+   "m": "Theft of a credit card",
+   "kind": "PC"
+  },
+  "484f": {
+   "m": "Forged credit card",
+   "kind": "PC"
+  },
+  "484g": {
+   "m": "Illegal use of a credit card",
+   "kind": "PC"
+  },
+  "487": {
+   "m": "Grand Theft ($400+)",
+   "kind": "PC"
+  },
+  "488": {
+   "m": "Petty theft (<$400)",
+   "kind": "PC"
+  },
+  "496": {
+   "m": "Receiving stolen property",
+   "kind": "PC"
+  },
+  "499b": {
+   "m": "Joyriding",
+   "kind": "PC"
+  },
+  "503": {
+   "m": "Embezzlement",
+   "kind": "PC"
+  },
+  "5150": {
+   "m": "Mental/emotional",
+   "kind": "HS"
+  },
+  "5170": {
+   "m": "Unable to care for self",
+   "kind": "HS"
+  },
+  "537": {
+   "m": "Nonpayment of a bill (Restaurants, etc.)",
+   "kind": "PC"
+  },
+  "537e": {
+   "m": "Article with serial number removed",
+   "kind": "PC"
+  },
+  "555": {
+   "m": "Posted trespass",
+   "kind": "PC"
+  },
+  "594": {
+   "m": "Vandalism",
+   "kind": "PC"
+  },
+  "597": {
+   "m": "Killing or abusing animals",
+   "kind": "PC"
+  },
+  "602L": {
+   "m": "Trespass",
+   "kind": "PC"
+  },
+  "603": {
+   "m": "Trespass with damage",
+   "kind": "PC"
+  },
+  "647a": {
+   "m": "Annoy/molest child",
+   "kind": "PC"
+  },
+  "647b": {
+   "m": "Prostitution",
+   "kind": "PC"
+  },
+  "647f": {
+   "m": "Drunk in public",
+   "kind": "PC"
+  },
+  "647g": {
+   "m": "Disorderly conduct - loitering on private property at night",
+   "kind": "PC"
+  },
+  "647h": {
+   "m": "Disorderly conduct - peeking into an inhabited building",
+   "kind": "PC"
+  },
+  "653m": {
+   "m": "Harassment by phone (obscene call)",
+   "kind": "PC"
+  },
+  "67": {
+   "m": "Offer a bribe to executive officer",
+   "kind": "PC"
+  },
+  "69": {
+   "m": "Deter/resist executive officer (other than peace officer) by threat/force/violence",
+   "kind": "PC"
+  },
+  "71": {
+   "m": "Threaten injury to school officer or employee",
+   "kind": "PC"
+  },
+  "900": {
+   "m": "Series Codes",
+   "kind": "radio"
+  },
+  "904": {
+   "m": "Fire.",
+   "kind": "radio"
+  },
+  "904A": {
+   "m": "Automobile fire.",
+   "kind": "radio"
+  },
+  "904B": {
+   "m": "Building fire.",
+   "kind": "radio"
+  },
+  "904G": {
+   "m": "Grass fire.",
+   "kind": "radio"
+  },
+  "909": {
+   "m": "Traffic problem; police needed.",
+   "kind": "radio"
+  },
+  "910": {
+   "m": "Can handle this detail.",
+   "kind": "radio"
+  },
+  "925": {
+   "m": "Suspicious vehicle.",
+   "kind": "radio"
+  },
+  "932": {
+   "m": "Turn on _______ mobile relay at _______.",
+   "kind": "radio"
+  },
+  "933": {
+   "m": "Turn off mobile relay.",
+   "kind": "radio"
+  },
+  "949": {
+   "m": "Burning inspection at _______.",
+   "kind": "radio"
+  },
+  "950": {
+   "m": "Control burn in progress/about to begin/ended.",
+   "kind": "radio"
+  },
+  "951": {
+   "m": "Need fire investigator.",
+   "kind": "radio"
+  },
+  "952": {
+   "m": "Report on conditions.",
+   "kind": "radio"
+  },
+  "953": {
+   "m": "Investigate smoke.",
+   "kind": "radio"
+  },
+  "953A": {
+   "m": "Investigate gas.",
+   "kind": "radio"
+  },
+  "954": {
+   "m": "Off the air at the scene of the fire.",
+   "kind": "radio"
+  },
+  "955": {
+   "m": "Fire is under control.",
+   "kind": "radio"
+  },
+  "956": {
+   "m": "Assignment not finished.",
+   "kind": "radio"
+  },
+  "957": {
+   "m": "Delayed response of __ minutes.",
+   "kind": "radio"
+  },
+  "980": {
+   "m": "Restrict calls to emergency only.",
+   "kind": "radio"
+  },
+  "981": {
+   "m": "Resume normal traffic.",
+   "kind": "radio"
+  },
+  "Code 1": {
+   "m": "Acknowledge / answer your radio",
+   "kind": "radio",
+   "lapd": true
+  },
+  "Code 10": {
+   "m": "Bomb threat",
+   "kind": "radio"
+  },
+  "Code 12": {
+   "m": "Notify news media",
+   "kind": "radio"
+  },
+  "Code 2": {
+   "m": "Urgent.",
+   "kind": "radio"
+  },
+  "Code 20": {
+   "m": "Officer needs assistance",
+   "kind": "radio"
+  },
+  "Code 22": {
+   "m": "Restricted radio traffic",
+   "kind": "radio"
+  },
+  "Code 3": {
+   "m": "Emergency/lights and siren.",
+   "kind": "radio"
+  },
+  "Code 30": {
+   "m": "Burglar alarm ringing (LAPD)",
+   "kind": "radio",
+   "lapd": true
+  },
+  "Code 33": {
+   "m": "Mobile emergency - clear this radio channel.",
+   "kind": "radio"
+  },
+  "Code 37": {
+   "m": "Stolen / wanted vehicle (LAPD)",
+   "kind": "radio",
+   "lapd": true
+  },
+  "Code 4": {
+   "m": "No further assistance is needed.",
+   "kind": "radio"
+  },
+  "Code 43": {
+   "m": "TAC forces committed.",
+   "kind": "radio"
+  },
+  "Code 5": {
+   "m": "Stakeout.",
+   "kind": "radio"
+  },
+  "Code 6": {
+   "m": "Out of the car to investigate (LAPD)",
+   "kind": "radio",
+   "lapd": true
+  },
+  "Code 6A": {
+   "m": "Out to investigate, assistance may be needed (LAPD)",
+   "kind": "radio",
+   "lapd": true
+  },
+  "Code 7": {
+   "m": "Meal break (LAPD)",
+   "kind": "radio",
+   "lapd": true
+  },
+  "Code 8": {
+   "m": "Request cover/backup.",
+   "kind": "radio"
+  },
+  "Code 9": {
+   "m": "Set up a roadblock.",
+   "kind": "radio"
+  }
+ }
+}

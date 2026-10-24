@@ -32,13 +32,13 @@ import numpy as np
 
 from smashdr.core import bandplan
 from smashdr.core import settings as cfg
-from smashdr.core import transcribe
+from smashdr.core import codes, transcribe
 from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1050,7 +1050,7 @@ class MainWindow(QtWidgets.QMainWindow):
             text = "[error] " + r["error"]
         else:
             text = r.get("text") or "(nothing recognised)"
-            body = html.escape(text)
+            body, text = self._explain_codes(text)
         self.tx_view.append(f"<p style='margin:0 0 8px 0'><span style='color:gray'>"
                             f"{html.escape(head)}</span><br>{body}</p>")
         line = f"{head}  ->  {text}"
@@ -1060,6 +1060,21 @@ class MainWindow(QtWidgets.QMainWindow):
                 f.write(time.strftime("%Y-%m-%d ") + line + "\n")
         except OSError:
             pass
+
+    @staticmethod
+    def _explain_codes(text):
+        """(html with codes highlighted + explained, plain text with [meanings])."""
+        parts_h, parts_t, pos = [], [], 0
+        for match, meaning, s0, e0 in codes.annotate(text):
+            parts_h.append(html.escape(text[pos:s0]))
+            parts_t.append(text[pos:s0])
+            parts_h.append(f"<b style='color:#ffd54f'>{html.escape(match)}</b> "
+                           f"<span style='color:#9fa8da'>[{html.escape(meaning)}]</span>")
+            parts_t.append(f"{match} [{meaning}]")
+            pos = e0
+        parts_h.append(html.escape(text[pos:]))
+        parts_t.append(text[pos:])
+        return "".join(parts_h), "".join(parts_t)
 
     def _preset_name(self, freq_hz) -> str:
         if freq_hz is not None:

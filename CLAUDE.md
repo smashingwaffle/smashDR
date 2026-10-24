@@ -79,6 +79,9 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
 - `core/transcribe.py` faster-whisper (small.en or large-v3-turbo via Settings, CPU int8, hotwords + junk filter; Stefaan has Iris Xe,
   no NVIDIA) on finished clear P25 calls, background queue -> right-hand
   Transcripts column + user/transcripts.txt. Optional dependency.
+- `core/codes.py` + `data/codes.json`: codes in transcripts (Code N, 10-/11-codes,
+  PC/VC/H&S numbers, address-guarded) get highlighted + explained. Glossary from
+  Stefaan's CA list; `lapd: true` entries override (LAPD Code 6 = out to investigate).
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 
