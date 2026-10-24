@@ -32,14 +32,14 @@ import numpy as np
 
 from smashdr.core import bandplan
 from smashdr.core import settings as cfg
-from smashdr.core import codes, places, transcribe
+from smashdr.core import codes, flightaware, places, transcribe
 from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.4.4"
+VERSION = "0.4.5"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -952,10 +952,40 @@ class MainWindow(QtWidgets.QMainWindow):
         carto_note.setOpenExternalLinks(True)
         carto_note.setWordWrap(True)
         carto_note.setStyleSheet("color: gray;")
-        maps = QtWidgets.QGroupBox("Maps")
+        self.fa_edit = QtWidgets.QLineEdit(str(opts.get("aeroapi_key", "")))
+        self.fa_edit.setPlaceholderText("paste your FlightAware AeroAPI (Personal) key")
+        self.fa_edit.setClearButtonEnabled(True)
+        self.fa_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit)
+        self.fa_edit.editingFinished.connect(
+            lambda: self.opts.__setitem__("aeroapi_key", self.fa_edit.text().strip()))
+        self.fa_cap = QtWidgets.QSpinBox()
+        self.fa_cap.setRange(0, 100_000)
+        self.fa_cap.setSuffix(" lookups / month")
+        self.fa_cap.setValue(int(opts.get("aeroapi_cap", 900)))
+        self.fa_cap.valueChanged.connect(lambda v: self.opts.__setitem__("aeroapi_cap", int(v)))
+        self.fa_used = QtWidgets.QLabel()
+        fa_row = QtWidgets.QHBoxLayout()
+        fa_row.addWidget(self.fa_cap)
+        fa_row.addWidget(self.fa_used, 1)
+        fa_note = QtWidgets.QLabel(
+            "Optional: today's real route, times and delays when you click a plane. Personal tier "
+            "at <a href='https://www.flightaware.com/aeroapi/'>flightaware.com/aeroapi</a> includes "
+            "$5 free usage a month (~1,000 lookups at ~$0.005). The cap stops lookups before that; "
+            "then it falls back to adsbdb + the flight-path check.")
+        fa_note.setOpenExternalLinks(True)
+        fa_note.setWordWrap(True)
+        fa_note.setStyleSheet("color: gray;")
+        self._fa_timer = QtCore.QTimer(self)
+        self._fa_timer.timeout.connect(self._show_fa_usage)
+        self._fa_timer.start(3000)
+
+        maps = QtWidgets.QGroupBox("Maps and flight info")
         mf = QtWidgets.QFormLayout(maps)
         mf.addRow("CARTO key", self.carto_edit)
         mf.addRow("", carto_note)
+        mf.addRow("FlightAware key", self.fa_edit)
+        mf.addRow("Monthly cap", fa_row)
+        mf.addRow("", fa_note)
 
         lay = QtWidgets.QVBoxLayout()
         for g in (radio, audio_box, display, recording, stt, maps):
@@ -1059,6 +1089,12 @@ class MainWindow(QtWidgets.QMainWindow):
     # ======================================================================
     # P25 call readout
     # ======================================================================
+    def _show_fa_usage(self):
+        if hasattr(self, "aircraft_tab"):
+            used, cap = self.aircraft_tab.fa_usage()
+            cost = used * flightaware.COST_PER_CALL
+            self.fa_used.setText(f"used this month: {used} (~${cost:.2f} of the $5 free credit)")
+
     def _set_carto_key(self):
         key = self.carto_edit.text().strip()
         if key != str(self.opts.get("carto_key", "")):
@@ -1527,6 +1563,8 @@ class MainWindow(QtWidgets.QMainWindow):
             rec_dir=self.rec_dir_edit.text().strip(),
             stt_model=self.stt_box.currentData(),
             carto_key=self.carto_edit.text().strip(),
+            aeroapi_key=self.fa_edit.text().strip(),
+            aeroapi_cap=self.fa_cap.value(),
         )
 
     def _save_opts(self):

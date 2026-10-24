@@ -97,6 +97,9 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   `core/airports.py` infers arriving/departed SoCal airport from position,
   track, altitude, climb (airline callsigns -> airline airports only) and the
   card flags database routes that disagree.
+  Optional FlightAware AeroAPI key (Settings > Maps and flight info,
+  `core/flightaware.py`): /flights/{callsign} on click only, cached per day,
+  monthly cap (default 900, counter in settings), 10/min; else adsbdb.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 

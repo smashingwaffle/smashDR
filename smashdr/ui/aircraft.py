@@ -12,7 +12,7 @@ import time
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from smashdr.core import airlines, airports
+from smashdr.core import airlines, airports, flightaware
 from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import cu8_to_iq
 from smashdr.decoders import adsb
@@ -348,7 +348,9 @@ class AircraftTab(QtWidgets.QWidget):
         self._planes = {}                       # icao -> latest snapshot dict
         self._selected = None
         self._info = {}                         # icao -> aircraft info (adsbdb), or None
-        self._routes = {}                       # callsign -> route text, or None
+        self._routes = {}                       # callsign -> adsbdb route dict / "unknown" / None
+        self._fa = {}                           # callsign -> (day, AeroAPI summary or "none"/None)
+        self._fa_times = []                     # call times (10/min limit)
         self._net = QtNetwork.QNetworkAccessManager(self)
 
         self.dev_box = QtWidgets.QComboBox()
@@ -620,6 +622,11 @@ class AircraftTab(QtWidgets.QWidget):
     def _route_html(self, p, lookup):
         """Route line: what the plane is doing (inferred) checked against the database."""
         seen = airports.infer(p)
+        fa = self._fa.get(p["callsign"], (None, None))[1] if p["callsign"] else None
+        if isinstance(fa, dict):
+            return self._fa_html(fa, seen)
+        if fa is None and p["callsign"] in self._fa:
+            return "<span style='color:#9aa0a6'>FlightAware: looking up…</span>"
         db = self._routes.get(p["callsign"]) if p["callsign"] else None
         parts = []
         if seen:
@@ -646,6 +653,30 @@ class AircraftTab(QtWidgets.QWidget):
             parts.append(p["callsign"] or "No callsign yet")
         return "<br>".join(parts)
 
+    @staticmethod
+    def _fa_html(fa, seen):
+        def late(mins):
+            if mins is None or abs(mins) < 3:
+                return "<span style='color:#81c784'>on time</span>"
+            if mins > 0:
+                return f"<span style='color:#ffb74d'>{mins} min late</span>"
+            return f"<span style='color:#81c784'>{-mins} min early</span>"
+        (o, oc), (d, dc) = fa["orig"], fa["dest"]
+        out = [f"<b>{o}</b> {oc}  →  <b>{d}</b> {dc}"]
+        small = [fa["status"]] if fa["status"] else []
+        small.append(f"dep {fa['dep']} ({late(fa['dep_delay'])})")
+        small.append(f"arr {fa['arr']} ({late(fa['arr_delay'])})")
+        if fa["diverted"]:
+            small.append("<span style='color:#ff5252'>DIVERTED</span>")
+        out.append("<span style='font-size:10pt; color:#c8ccd0'>" + "  ·  ".join(small) +
+                   "</span>")
+        if seen and seen[1] not in (o, d):
+            word = "arriving" if seen[0] == "arr" else "departed"
+            out.append(f"<span style='font-size:10pt; color:#ffb74d'>flight path says {word} "
+                       f"{seen[1]}: diversion or data mix-up?</span>")
+        out.append("<span style='font-size:9pt; color:#80868b'>FlightAware</span>")
+        return "<br>".join(out)
+
     def _get(self, url, handler):
         req = QtNetwork.QNetworkRequest(QtCore.QUrl(url))
         req.setRawHeader(b"User-Agent", b"smashDR (personal ADS-B viewer)")
@@ -670,13 +701,70 @@ class AircraftTab(QtWidgets.QWidget):
                       lambda d, i=icao: self._got_aircraft(i, d))
         elif self._info[icao] and self._info[icao].get("pixmap") is not None:
             self.card.photo.setPixmap(self._info[icao]["pixmap"])
-        if cs and cs not in self._routes:
+        if cs and self._fa_lookup(cs):
+            pass                                  # FlightAware answers the route
+        elif cs and cs not in self._routes:
             self._routes[cs] = None
             self._get(f"https://api.adsbdb.com/v0/callsign/{cs}",
                       lambda d, c=cs: self._got_route(c, d))
         if self._info.get(icao) is None:
             self.card.photo.setPixmap(QtGui.QPixmap())
             self.card.photo.setText("no photo")
+
+    # ---- FlightAware AeroAPI (optional key, monthly cap) -------------------
+    def fa_usage(self):
+        month = time.strftime("%Y-%m")
+        if self.opts.get("aeroapi_month") != month:
+            self.opts["aeroapi_month"], self.opts["aeroapi_used"] = month, 0
+        return int(self.opts.get("aeroapi_used", 0)), int(self.opts.get("aeroapi_cap", 900))
+
+    def _fa_lookup(self, cs):
+        """True if FlightAware has / will have the route for this callsign."""
+        key = str(self.opts.get("aeroapi_key", "")).strip()
+        if not key:
+            return False
+        day = time.strftime("%Y-%m-%d")
+        cached = self._fa.get(cs)
+        if cached and cached[0] == day:
+            return cached[1] != "none"
+        used, cap = self.fa_usage()
+        now = time.time()
+        self._fa_times = [t for t in self._fa_times if now - t < 60]
+        if used >= cap or len(self._fa_times) >= 10:
+            return False
+        self._fa_times.append(now)
+        self.opts["aeroapi_used"] = used + 1
+        self._fa[cs] = (day, None)
+        req = QtNetwork.QNetworkRequest(QtCore.QUrl(flightaware.flight_url(cs)))
+        req.setRawHeader(b"x-apikey", key.encode())
+        req.setRawHeader(b"Accept", b"application/json")
+        reply = self._net.get(req)
+        reply.finished.connect(lambda r=reply, c=cs, d=day: self._fa_done(r, c, d))
+        return True
+
+    def _fa_done(self, reply, cs, day):
+        try:
+            code = reply.attribute(QtNetwork.QNetworkRequest.Attribute.HttpStatusCodeAttribute)
+            data = bytes(reply.readAll())
+            if code == 200:
+                sm = flightaware.summary(data)
+                self._fa[cs] = (day, sm if sm else "none")
+            else:
+                self._fa[cs] = (day, "none")
+                msg = {401: "FlightAware key rejected (check Settings)",
+                       429: "FlightAware rate limit, try again in a minute"}.get(
+                    code, f"FlightAware lookup failed ({code or reply.errorString()})")
+                self.stat_lbl.setText(msg)
+                print("[aeroapi]", cs, code, data[:200])
+            if self._fa[cs][1] == "none" and cs not in self._routes:
+                self._routes[cs] = None                  # fall back to adsbdb
+                self._get(f"https://api.adsbdb.com/v0/callsign/{cs}",
+                          lambda d, c=cs: self._got_route(c, d))
+        finally:
+            reply.deleteLater()
+        p = self._planes.get(self._selected)
+        if p and p["callsign"] == cs:
+            self._update_card()
 
     def _got_aircraft(self, icao, data):
         a = _field(data, "aircraft")
