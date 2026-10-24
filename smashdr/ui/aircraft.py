@@ -548,6 +548,20 @@ class AircraftTab(QtWidgets.QWidget):
         left = QtWidgets.QWidget()
         ll = QtWidgets.QVBoxLayout(left)
         ll.setContentsMargins(0, 0, 0, 0)
+        self.search = QtWidgets.QLineEdit()
+        self.search.setPlaceholderText("Search: flight, airline, ICAO, squawk, country, LAX, "
+                                       "helicopter…   (Enter = select first match)")
+        self.search.setClearButtonEnabled(True)
+        self.search.setStyleSheet("QLineEdit { padding: 6px 8px; font-size: 11pt; "
+                                  "border-radius: 6px; }")
+        self.search.textChanged.connect(lambda _t: self._refresh())
+        self.search.returnPressed.connect(self._search_enter)
+        self.match_lbl = QtWidgets.QLabel("")
+        self.match_lbl.setStyleSheet("color: #9aa0a6;")
+        srow = QtWidgets.QHBoxLayout()
+        srow.addWidget(self.search, 1)
+        srow.addWidget(self.match_lbl)
+        ll.addLayout(srow)
         ll.addWidget(self.card)
         ll.addWidget(self.table, 1)
 
@@ -941,24 +955,68 @@ class AircraftTab(QtWidgets.QWidget):
             self._update_card()
 
     # ------------------------------------------------------------------
+    def _haystack(self, p):
+        """Everything a search can match for one plane (lower case)."""
+        code, name, _num = airlines.split(p["callsign"])
+        _iso, cname = country(p["icao"])
+        bits = [p["callsign"], p["icao"], p["squawk"], name, code, cname]
+        if p["rotor"]:
+            bits += ["helicopter", "heli", "rotor"]
+        if not name and p["callsign"]:
+            bits += ["private"]
+        seen = airports.infer(p)
+        if seen:
+            bits += [seen[1], seen[2], "arriving" if seen[0] == "arr" else "departed"]
+        if p["squawk"] in EMERGENCY:
+            bits += ["emergency", EMERGENCY[p["squawk"]]]
+        info = self._info.get(p["icao"])
+        if info:
+            bits.append(info.get("text"))
+        fa = self._fa.get(p["callsign"], (None, None))[1] if p["callsign"] else None
+        if isinstance(fa, dict):
+            bits += [fa["orig"][0], fa["orig"][1], fa["dest"][0], fa["dest"][1], fa["type"], fa["reg"]]
+        db = self._routes.get(p["callsign"]) if p["callsign"] else None
+        if isinstance(db, dict):
+            bits += [db["orig"][0], db["orig"][1], db["dest"][0], db["dest"][1]]
+        return " ".join(str(b) for b in bits if b).lower()
+
+    def _matches(self, planes):
+        q = self.search.text().strip().lower()
+        if not q:
+            return planes
+        words = q.split()
+        return [p for p in planes if all(w in self._haystack(p) for w in words)]
+
+    def _search_enter(self):
+        shown = self._matches(list(self._planes.values()))
+        if shown:
+            first = min(shown, key=lambda p: p["dist_km"] if p["dist_km"] is not None else 1e9)
+            self._select(first["icao"], center=True)
+            self._select_row(first["icao"])
+
+    def _refresh(self):
+        """Re-draw list + map from the last snapshot (e.g. search text changed)."""
+        planes = list(self._planes.values())
+        shown = self._matches(planes)
+        q = self.search.text().strip()
+        self.match_lbl.setText(f"{len(shown)} of {len(planes)}" if q else "")
+        self._fill_table(shown)
+        if HAVE_WEB and self._map_ready:
+            js = [{"icao": p["icao"], "flight": p["callsign"] or "", "lat": p["lat"],
+                   "lon": p["lon"], "alt": p["alt"], "track": p["track"],
+                   "rotor": p["rotor"], "emergency": p["squawk"] in EMERGENCY,
+                   "trail": p["trail"]} for p in shown]
+            self._js(f"update({json.dumps(js)})")
+
     def _on_snapshot(self, planes, stats):
         self._planes = {p["icao"]: p for p in planes}
         with_pos = sum(1 for p in planes if p["lat"] is not None)
         self.stat_lbl.setText(f"{len(planes)} aircraft ({with_pos} with position)  ·  "
                               f"{stats['msgs_per_s']:.0f} msg/s  ·  {stats['total']} total"
                               + (f"  ·  {stats['dropped']} blocks dropped" if stats["dropped"] else ""))
-        self._fill_table(planes)
+        self._refresh()
         if self._selected in self._planes:
             self._update_card()
-        if HAVE_WEB and self._map_ready:
-            js = []
-            for p in planes:
-                name, _code = flight_name(p["callsign"])
-                js.append({"icao": p["icao"], "flight": p["callsign"] or "", "lat": p["lat"],
-                           "lon": p["lon"], "alt": p["alt"], "track": p["track"],
-                           "rotor": p["rotor"], "emergency": p["squawk"] in EMERGENCY,
-                           "trail": p["trail"]})
-            self._js(f"update({json.dumps(js)})")
 
     def _fill_table(self, planes):
         bold = QtGui.QFont()
