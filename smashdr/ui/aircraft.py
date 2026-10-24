@@ -122,6 +122,11 @@ html,body,#map{height:100%;margin:0;background:#1e1e1e}
 .pl.sel{background:#ffd54f;color:#111;border-color:#ffd54f}
 .osm-dark{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9)}
 .leaflet-container{font-family:Segoe UI,Arial,sans-serif}
+.apt{font:600 10px Segoe UI,Arial,sans-serif;color:#cfd8dc;background:rgba(20,20,20,.7);
+     border:none;box-shadow:none;padding:0 4px;border-radius:3px}
+.apt:before{display:none}
+.apt.airline{color:#fff;font-size:11px;background:rgba(41,98,255,.55)}
+.apt.military{color:#c5e1a5}
 </style></head><body><div id="map"></div><script>
 var VIEW = __VIEW__;
 var map = L.map('map', {zoomControl:true}).setView(VIEW ? [VIEW[0], VIEW[1]] : [__LAT__, __LON__], VIEW ? VIEW[2] : 9);
@@ -143,7 +148,37 @@ if (cartoKey) {
 }
 var want = __LAYER__;
 (layers[want] || (cartoKey ? layers['Dark (CARTO)'] : dark)).addTo(map);
-L.control.layers(layers, null, {position: 'topright'}).addTo(map);
+var airportLayer = L.layerGroup();
+var aptMarkers = [];
+__AIRPORTS__.forEach(function(a){
+  var big = a.kind === 'airline';
+  var col = big ? '#2962ff' : (a.kind === 'military' ? '#7cb342' : '#90a4ae');
+  var m = L.marker([a.lat, a.lon], {interactive: true, keyboard: false,
+    icon: L.divIcon({className: '', iconSize: [big ? 16 : 11, big ? 16 : 11],
+      iconAnchor: [big ? 8 : 5.5, big ? 8 : 5.5],
+      html: '<svg width="'+(big?16:11)+'" height="'+(big?16:11)+'" viewBox="-8 -8 16 16">' +
+            '<circle r="6.5" fill="#111" stroke="'+col+'" stroke-width="2"/>' +
+            '<path d="M-4,1 L4,-1" stroke="'+col+'" stroke-width="2.2" stroke-linecap="round"/></svg>'})});
+  m.bindTooltip(a.code, {permanent: true, direction: 'bottom', offset: [0, 4],
+                         className: 'apt ' + a.kind});
+  m.bindPopup('<b>' + a.code + '</b> ' + a.name + (a.kind === 'military' ? ' (military)' : ''));
+  m.addTo(airportLayer); aptMarkers.push({m: m, big: big});
+});
+function aptLabels(){
+  var z = map.getZoom();
+  aptMarkers.forEach(function(o){
+    var show = o.big ? z >= 7 : z >= 9;
+    var t = o.m.getTooltip();
+    if (show && !o.m.isTooltipOpen()) o.m.openTooltip();
+    if (!show && o.m.isTooltipOpen()) o.m.closeTooltip();
+  });
+}
+var showApts = __SHOW_AIRPORTS__;
+if (showApts) airportLayer.addTo(map);
+map.on('zoomend', aptLabels); map.whenReady(aptLabels);
+map.on('overlayadd', function(e){ if (e.layer === airportLayer){ aptLabels(); console.log('AIRPORTS:1'); } });
+map.on('overlayremove', function(e){ if (e.layer === airportLayer) console.log('AIRPORTS:0'); });
+L.control.layers(layers, {'Airports': airportLayer}, {position: 'topright'}).addTo(map);
 map.on('baselayerchange', function(e){ console.log('LAYER:' + e.name); });
 map.on('moveend', function(){ var c = map.getCenter();
   console.log('VIEW:' + c.lat.toFixed(5) + ',' + c.lng.toFixed(5) + ',' + map.getZoom()); });
@@ -260,6 +295,8 @@ if HAVE_WEB:
                 self.pref.emit("layer", message[6:])
             elif message.startswith("VIEW:"):
                 self.pref.emit("view", message[5:])
+            elif message.startswith("AIRPORTS:"):
+                self.pref.emit("airports", message[9:])
 
 
 def _field(data, key):
@@ -649,12 +686,16 @@ class AircraftTab(QtWidgets.QWidget):
                 .replace("__ALT_STOPS__", stops)
                 .replace("__VIEW__", json.dumps(view if isinstance(view, list) and len(view) == 3 else None))
                 .replace("__LAYER__", json.dumps(str(self.opts.get("adsb_map_layer", ""))))
+                .replace("__AIRPORTS__", json.dumps(airports.map_list()))
+                .replace("__SHOW_AIRPORTS__", "true" if self.opts.get("adsb_map_airports", True) else "false")
                 .replace("__CARTO_KEY__", json.dumps(str(self.opts.get("carto_key", "")).strip())))
         self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/"))
 
     def _map_pref(self, kind, value):
         if kind == "layer":
             self.opts["adsb_map_layer"] = value
+        elif kind == "airports":
+            self.opts["adsb_map_airports"] = value == "1"
         elif kind == "view":
             try:
                 lat, lon, z = value.split(",")

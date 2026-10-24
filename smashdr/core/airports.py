@@ -31,10 +31,51 @@ AIRPORTS = {
     "SBD": ("San Bernardino", 34.0954, -117.2349),
     "PMD": ("Palmdale", 34.6294, -118.0846),
     "WJF": ("Lancaster / Fox", 34.7411, -118.2186),
+    "SLI": ("Los Alamitos Army Airfield", 33.7900, -118.0517),
+    "AVX": ("Catalina", 33.4049, -118.4158),
+    "AJO": ("Corona", 33.8975, -117.6024),
+    "RIV": ("March Air Reserve Base", 33.8807, -117.2594),
+    "HMT": ("Hemet-Ryan", 33.7340, -117.0226),
+    "F70": ("French Valley", 33.5742, -117.1285),
+    "VCV": ("Victorville / SCLA", 34.5975, -117.3830),
+    "APV": ("Apple Valley", 34.5753, -117.1862),
+    "L35": ("Big Bear City", 34.2637, -116.8560),
+    "EDW": ("Edwards Air Force Base", 34.9054, -117.8839),
+    "PSP": ("Palm Springs", 33.8297, -116.5067),
+    "UDD": ("Bermuda Dunes", 33.7484, -116.2748),
+    "TRM": ("Thermal / Jacqueline Cochran", 33.6267, -116.1600),
+    "SAN": ("San Diego", 32.7336, -117.1897),
+    "CRQ": ("Carlsbad / McClellan-Palomar", 33.1283, -117.2800),
+    "OCN": ("Oceanside", 33.2190, -117.3496),
+    "MYF": ("San Diego / Montgomery-Gibbs", 32.8157, -117.1396),
+    "SEE": ("El Cajon / Gillespie", 32.8262, -116.9724),
+    "SDM": ("San Diego / Brown Field", 32.5723, -116.9802),
+    "NKX": ("MCAS Miramar", 32.8684, -117.1428),
+    "NZY": ("NAS North Island", 32.6992, -117.2153),
+    "OXR": ("Oxnard", 34.2008, -119.2072),
+    "CMA": ("Camarillo", 34.2137, -119.0943),
+    "NTD": ("NAS Point Mugu", 34.1203, -119.1210),
+    "SZP": ("Santa Paula", 34.3472, -119.0610),
+    "SBA": ("Santa Barbara", 34.4262, -119.8401),
+    "SMX": ("Santa Maria", 34.8989, -120.4575),
+    "IPL": ("Imperial County", 32.8342, -115.5786),
+    "BLH": ("Blythe", 33.6192, -114.7169),
 }
+MILITARY = {"SLI", "RIV", "EDW", "NKX", "NZY", "NTD"}
 KM_PER_MI = 1.609344
-AIRLINE_FIELDS = {"LAX", "BUR", "LGB", "SNA", "ONT"}            # scheduled airline service
-JET_FIELDS = AIRLINE_FIELDS | {"VNY", "SMO", "HHR", "PMD", "SBD", "CNO", "FUL", "RAL"}
+AIRLINE_FIELDS = {"LAX", "BUR", "LGB", "SNA", "ONT", "SAN", "PSP", "SBA"}   # airline service
+JET_FIELDS = AIRLINE_FIELDS | {"VNY", "SMO", "HHR", "PMD", "SBD", "CNO", "FUL", "RAL", "CRQ",
+                               "MYF", "TRM", "CMA", "OXR", "VCV", "SMX", "IPL"} | MILITARY
+
+
+def kind(code):
+    return "airline" if code in AIRLINE_FIELDS else ("military" if code in MILITARY else "ga")
+
+
+def map_list():
+    """[{code, name, lat, lon, kind}] for the aircraft map."""
+    return [{"code": c, "name": n, "lat": la, "lon": lo, "kind": kind(c)}
+            for c, (n, la, lo) in AIRPORTS.items()]
 
 
 def _dist_bearing(lat1, lon1, lat2, lon2):
@@ -68,7 +109,7 @@ def infer(p):
     elif (p.get("gs") or 0) > 180:
         fields = JET_FIELDS
     else:
-        fields = AIRPORTS.keys()
+        fields = [c for c in AIRPORTS if c not in MILITARY]
     best = None
     for code in fields:
         name, alat, alon = AIRPORTS[code]
