@@ -34,7 +34,7 @@ import settings as cfg
 from dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -494,6 +494,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.freqs_mhz = None
         self.avg = None
         self.wf = np.full((WF_ROWS, FFT_SIZE), -120.0, dtype=np.float32)
+        self._wf_rect = None
 
         self.reader = SdrReader(sdr, opts)
 
@@ -1161,7 +1162,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.wf[:] = np.median(spec)
             f0 = self.freqs_mhz[0]
             span = rate / 1e6
-            self.wf_img.setRect(QtCore.QRectF(f0, 0, span, WF_ROWS))
+            self._wf_rect = QtCore.QRectF(f0, 0, span, WF_ROWS)
             self.spec_plot.setXRange(f0, f0 + span, padding=0)
             self.band_strip.redraw(center - rate / 2, center + rate / 2)
 
@@ -1177,6 +1178,10 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             levels = (self.wf_min.value(), max(self.wf_max.value(), self.wf_min.value() + 1))
         self.wf_img.setImage(self.wf, autoLevels=False, levels=levels)
+        if self._wf_rect is not None:
+            # setRect scales by the image size, so it only works once an image is set
+            self.wf_img.setRect(self._wf_rect)
+            self._wf_rect = None
 
         self.meter.set_values(stats["snr"], self.sq_slider.value(), stats["sq_open"])
 
