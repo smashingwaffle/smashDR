@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -656,6 +656,24 @@ class MainWindow(QtWidgets.QMainWindow):
             row2.addWidget(w)
         row2.addWidget(self.meter, 1)
         for w in (QtWidgets.QLabel("Vol"), self.vol_slider, self.mute_chk, self.rec_btn):
+            row2.addWidget(w)
+        # waterfall look, right here so you can watch it while adjusting
+        self.wf_bright = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.wf_bright.setRange(-15, 15)
+        self.wf_bright.setValue(int(self.opts.get("wf_bright", 0)))
+        self.wf_bright.setToolTip("Waterfall black level: right = darker background (hides noise), "
+                                  "left = brighter (shows weak signals). Double-click to reset.")
+        self.wf_contrast = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.wf_contrast.setRange(50, 300)
+        self.wf_contrast.setValue(int(self.opts.get("wf_contrast", 100)))
+        self.wf_contrast.setToolTip("Waterfall contrast: right = weak signals pop more. "
+                                    "Double-click to reset.")
+        for sl, default in ((self.wf_bright, 0), (self.wf_contrast, 100)):
+            sl.setFixedWidth(110)
+            sl.mouseDoubleClickEvent = lambda _e, s=sl, d=default: s.setValue(d)
+        row2.addSpacing(16)
+        for w in (QtWidgets.QLabel("WF black"), self.wf_bright,
+                  QtWidgets.QLabel("contrast"), self.wf_contrast):
             row2.addWidget(w)
 
         # --- band strip, spectrum, waterfall ---
@@ -1544,7 +1562,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 old = getattr(self, "_wf_lv", None)
                 self._wf_lv = (lo, hi) if old is None else (
                     0.7 * old[0] + 0.3 * lo, 0.7 * old[1] + 0.3 * hi)
-            levels = self._wf_lv
+            lo, hi = self._wf_lv
+            lo += self.wf_bright.value()
+            hi = lo + (hi - self._wf_lv[0]) * 100.0 / max(50, self.wf_contrast.value())
+            levels = (lo, max(hi, lo + 3.0))
         else:
             levels = (self.wf_min.value(), max(self.wf_max.value(), self.wf_min.value() + 1))
         self.wf_img.setImage(self.wf, autoLevels=False, levels=levels)
@@ -1604,6 +1625,8 @@ class MainWindow(QtWidgets.QMainWindow):
             rec_dir=self.rec_dir_edit.text().strip(),
             stt_model=self.stt_box.currentData(),
             stt_on=self.stt_chk.isChecked(),
+            wf_bright=self.wf_bright.value(),
+            wf_contrast=self.wf_contrast.value(),
             stt_skip_am=self.stt_am_chk.isChecked(),
             carto_key=self.carto_edit.text().strip(),
             aeroapi_key=self.fa_edit.text().strip(),
