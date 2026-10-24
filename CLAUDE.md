@@ -32,7 +32,7 @@ UX comes after the decode chain works.
 ```
 main.py                  entry (F5); stays in the root
 smashdr/paths.py         ROOT, data/, user/, recordings/, DLL dirs (root or lib/)
-smashdr/core/            no Qt widgets: dsp, bandplan, settings, vocoder
+smashdr/core/            no Qt widgets: dsp, bandplan, settings, vocoder, transcribe
 smashdr/ui/              PyQt6: receiver (main window), presets, widgets, audio
 smashdr/decoders/        p25, p25_fec, p25_live (DMR / Phase 2 go here later)
 data/presets_default.json  seed presets (in git)
@@ -76,6 +76,9 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
 - `tools/p25_file.py` frame report for a .cu8 recording
 - `ui/audio.py` QtMultimedia output, converts to device's preferred format
 - `core/settings.py` user/settings.json store (not in git)
+- `core/transcribe.py` faster-whisper (small.en, CPU int8; Stefaan has Iris Xe,
+  no NVIDIA) on finished clear P25 calls, background queue -> right-hand
+  Transcripts column + user/transcripts.txt. Optional dependency.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 

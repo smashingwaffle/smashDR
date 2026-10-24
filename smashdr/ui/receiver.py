@@ -20,6 +20,7 @@ the dongle's DC spike; it re-centres automatically when you tune off-span.
 import argparse
 import json
 import os
+import html
 import queue
 import sys
 import threading
@@ -31,12 +32,13 @@ import numpy as np
 
 from smashdr.core import bandplan
 from smashdr.core import settings as cfg
+from smashdr.core import transcribe
 from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
-from smashdr.paths import RECORDINGS, ROOT  # noqa: E402
+from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.2.6"
+VERSION = "0.3.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -201,6 +203,7 @@ class SdrReader(QtCore.QThread):
     audio = QtCore.pyqtSignal(bytes)
     status = QtCore.pyqtSignal(str)
     p25_event = QtCore.pyqtSignal(object)
+    transcript = QtCore.pyqtSignal(object)
 
     def __init__(self, sdr: RtlSdr, opts: dict):
         super().__init__()
@@ -225,6 +228,14 @@ class SdrReader(QtCore.QThread):
         self._rec_path = None
         self._q = queue.Queue(maxsize=40)   # ~4 s of headroom at 2.4 MS/s
         self._cap = None
+        # speech-to-text of finished clear P25 calls (optional: pip install faster-whisper)
+        self._call_pcm = None               # list of 48 kHz chunks while a call is up
+        self._call_meta = None
+        self.transcriber = None
+        if transcribe.available():
+            self.transcriber = transcribe.Transcriber(self.transcript.emit)
+        else:
+            print("[i] Speech-to-text off: pip install faster-whisper")
 
     def request(self, **kw):
         with self._lock:
@@ -296,6 +307,20 @@ class SdrReader(QtCore.QThread):
 
         if "rec_start" in p:
             self._open_recording(p["rec_start"])
+
+    def _track_call(self, ev):
+        """Collect each call's audio; hand clear calls to the transcriber when they end."""
+        if self.transcriber is None or ev["type"] == "cc":
+            return
+        if ev["type"] == "start":
+            self._call_pcm, self._call_meta = [], dict(ev)
+        elif self._call_meta is not None:
+            self._call_meta.update(ev)
+        if ev["type"] == "end" and self._call_pcm is not None:
+            meta = dict(self._call_meta, freq_hz=self.target_hz, t_end=time.time())
+            if self._call_pcm and meta.get("encrypted") is False:
+                self.transcriber.submit(np.concatenate(self._call_pcm), meta)
+            self._call_pcm = self._call_meta = None
 
     def _configure_demod(self):
         rate = float(self.sdr.sample_rate)
@@ -407,7 +432,10 @@ class SdrReader(QtCore.QThread):
                 pcm, events = self.p25.process(iq)
                 if len(pcm):
                     self.audio.emit(pcm.tobytes())
+                    if self._call_pcm is not None:
+                        self._call_pcm.append(pcm)
                 for ev in events:
+                    self._track_call(ev)
                     self.p25_event.emit(ev)
             elif self._demod_ok:
                 pcm = self.demod.process(iq, sq_open)
@@ -524,6 +552,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reader.frame.connect(self.on_frame)
         self.reader.status.connect(self.status_lbl.setText)
         self.reader.p25_event.connect(self.on_p25_event)
+        self.reader.transcript.connect(self.on_transcript)
 
         self.presets_win = None
         self._apply_mode_ui()
@@ -666,6 +695,41 @@ class MainWindow(QtWidgets.QMainWindow):
         split.addWidget(self.wf_plot)
         split.setSizes([360, 420])
 
+        self.tx_view = QtWidgets.QTextBrowser()
+        self.tx_view.setOpenLinks(False)
+        ft = self.tx_view.font()
+        ft.setPointSize(ft.pointSize() + 1)
+        self.tx_view.setFont(ft)
+        self.tx_view.setPlaceholderText(
+            "Speech-to-text of clear P25 calls appears here."
+            if transcribe.available() else
+            "Speech-to-text is off.\n\nIn the VSCode terminal run:\n"
+            "pip install faster-whisper\n\nthen restart (F5).")
+        tx_title = QtWidgets.QLabel("Transcripts")
+        tf = tx_title.font()
+        tf.setBold(True)
+        tx_title.setFont(tf)
+        tx_clear = QtWidgets.QToolButton()
+        tx_clear.setText("Clear")
+        tx_clear.clicked.connect(self.tx_view.clear)
+        tx_head = QtWidgets.QHBoxLayout()
+        tx_head.addWidget(tx_title)
+        tx_head.addStretch(1)
+        tx_head.addWidget(tx_clear)
+        tx_panel = QtWidgets.QWidget()
+        tl = QtWidgets.QVBoxLayout(tx_panel)
+        tl.setContentsMargins(6, 0, 0, 0)
+        tx_panel.setMinimumWidth(200)
+        tl.addLayout(tx_head)
+        tl.addWidget(self.tx_view, 1)
+
+        hsplit = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        hsplit.addWidget(split)
+        hsplit.addWidget(tx_panel)
+        hsplit.setStretchFactor(0, 1)
+        hsplit.setStretchFactor(1, 0)
+        hsplit.setSizes([2800, 520])
+
         lay = QtWidgets.QVBoxLayout()
         lay.addLayout(row1)
         lay.addLayout(row2)
@@ -676,7 +740,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.p25_lbl.setFont(f2)
         self.p25_lbl.setMinimumHeight(28)
         lay.addWidget(self.p25_lbl)
-        lay.addWidget(split, 1)
+        lay.addWidget(hsplit, 1)
         lay.addWidget(self.info)
         lay.addWidget(self.status_lbl)
         w = QtWidgets.QWidget()
@@ -946,6 +1010,39 @@ class MainWindow(QtWidgets.QMainWindow):
     # ======================================================================
     # P25 call readout
     # ======================================================================
+    def on_transcript(self, r: dict):
+        stamp = time.strftime("%H:%M:%S", time.localtime(r.get("t_end", time.time())))
+        name = self._preset_name(r.get("freq_hz"))
+        who = []
+        if r.get("tgid") is not None:
+            who.append(f"TG {r['tgid']}")
+        if r.get("src") is not None:
+            who.append(f"radio {r['src']}")
+        head = f"{stamp}  {name}  {'  '.join(who)}  ({r.get('audio_s', 0):.1f} s)"
+        if r.get("error"):
+            body = f"<span style='color:#e53935'>{html.escape(r['error'])}</span>"
+            text = "[error] " + r["error"]
+        else:
+            text = r.get("text") or "(nothing recognised)"
+            body = html.escape(text)
+        self.tx_view.append(f"<p style='margin:0 0 8px 0'><span style='color:gray'>"
+                            f"{html.escape(head)}</span><br>{body}</p>")
+        line = f"{head}  ->  {text}"
+        print("[stt]", line, f"[{r.get('took_s', 0):.1f} s]")
+        try:
+            with open(USER / "transcripts.txt", "a", encoding="utf-8") as f:
+                f.write(time.strftime("%Y-%m-%d ") + line + "\n")
+        except OSError:
+            pass
+
+    def _preset_name(self, freq_hz) -> str:
+        if freq_hz is not None:
+            for p in self._tag_presets:
+                if abs(p["freq_hz"] - freq_hz) < 1000:
+                    return p["name"]
+            return f"{freq_hz / 1e6:.4f}"
+        return ""
+
     def on_p25_event(self, ev: dict):
         if ev["type"] == "cc":
             if self.p25_lbl.text().startswith("<span style='color:#43a047'>●"):
