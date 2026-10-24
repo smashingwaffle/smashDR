@@ -18,11 +18,14 @@ import numpy as np
 MODEL = "small.en"          # "base.en" is lighter/faster, less accurate
 MIN_SECONDS = 0.8           # skip blips / key-ups
 # Vocabulary hints: Whisper leans towards these spellings.
-PROMPT = ("LAPD radio dispatch, Hollenbeck, Northeast, Central, Rampart, Newton. "
-          "Unit 4A23, 4L10, 11A45. Code 3, Code 4, Code 6, Code 7, 415, 211, 459, 245, "
-          "10-4, roger, copy, en route, show me, handle, PR, suspect, vehicle, "
-          "Boyle Heights, Lincoln Heights, Highland Park, El Sereno, Eagle Rock, "
-          "Cesar Chavez, Soto, Huntington Drive, Figueroa, York Boulevard.")
+PROMPT = ("LAPD Hollenbeck dispatch. 4A27, 4A15, 4L30, 4X2, Air 10, Drone 1. "
+          "Adam, Boy, Charles, David, Edward, Frank, George, Henry, Ida, John, King, "
+          "Lincoln, Mary, Nora, Ocean, Paul, Robert, Sam, Tom, Victor, William, X-ray, Zebra. "
+          "Code 3, Code 4, Code 6, Code 7, 415, 211, 245, 459, 10-4, roger, copy, show me, "
+          "en route, PR, suspect, vehicle, 2315 Cesar Chavez Avenue, Soto Street, "
+          "Whittier Boulevard, 1st Street, 4th Street, Olympic, Lorena, Indiana, State Street, "
+          "Mission Road, Marengo, Valley Boulevard, Huntington Drive, Eastern Avenue, "
+          "Boyle Heights, Lincoln Heights, El Sereno.")
 
 
 def available() -> bool:
