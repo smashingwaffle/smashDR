@@ -76,7 +76,7 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
 - `tools/p25_file.py` frame report for a .cu8 recording
 - `ui/audio.py` QtMultimedia output, converts to device's preferred format
 - `core/settings.py` user/settings.json store (not in git)
-- `core/transcribe.py` faster-whisper (small.en, CPU int8; Stefaan has Iris Xe,
+- `core/transcribe.py` faster-whisper (small.en or large-v3-turbo via Settings, CPU int8, hotwords + junk filter; Stefaan has Iris Xe,
   no NVIDIA) on finished clear P25 calls, background queue -> right-hand
   Transcripts column + user/transcripts.txt. Optional dependency.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,

@@ -38,7 +38,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -233,7 +233,8 @@ class SdrReader(QtCore.QThread):
         self._call_meta = None
         self.transcriber = None
         if transcribe.available():
-            self.transcriber = transcribe.Transcriber(self.transcript.emit)
+            self.transcriber = transcribe.Transcriber(self.transcript.emit,
+                                                      opts.get("stt_model", transcribe.DEFAULT_MODEL))
         else:
             print("[i] Speech-to-text off: pip install faster-whisper")
 
@@ -908,8 +909,27 @@ class MainWindow(QtWidgets.QMainWindow):
         recf = QtWidgets.QFormLayout(recording)
         recf.addRow("Folder", rec_row)
 
+        # --- Speech-to-text ---
+        self.stt_box = QtWidgets.QComboBox()
+        for label, name in transcribe.MODELS.items():
+            self.stt_box.addItem(label, name)
+        i = self.stt_box.findData(opts.get("stt_model", transcribe.DEFAULT_MODEL))
+        self.stt_box.setCurrentIndex(max(0, i))
+        self.stt_box.currentIndexChanged.connect(self._set_stt_model)
+        stt_note = QtWidgets.QLabel(
+            "Transcribes clear P25 calls, on this PC (nothing goes online). Fast: a few seconds "
+            "per call. Accurate: better with codes and street names, slower, 1.6 GB download "
+            "the first time." if transcribe.available() else
+            "Off: run  pip install faster-whisper  in the VSCode terminal, then restart.")
+        stt_note.setWordWrap(True)
+        stt_note.setStyleSheet("color: gray;")
+        stt = QtWidgets.QGroupBox("Speech-to-text")
+        sf = QtWidgets.QFormLayout(stt)
+        sf.addRow("Model", self.stt_box)
+        sf.addRow("", stt_note)
+
         lay = QtWidgets.QVBoxLayout()
-        for g in (radio, audio_box, display, recording):
+        for g in (radio, audio_box, display, recording, stt):
             lay.addWidget(g)
         lay.addStretch(1)
         inner = QtWidgets.QWidget()
@@ -1010,6 +1030,12 @@ class MainWindow(QtWidgets.QMainWindow):
     # ======================================================================
     # P25 call readout
     # ======================================================================
+    def _set_stt_model(self, _i):
+        name = self.stt_box.currentData()
+        if self.reader.transcriber is not None:
+            self.reader.transcriber.set_model(name)
+            self.status_lbl.setText(f"Speech-to-text model: {name} (loads on the next call)")
+
     def on_transcript(self, r: dict):
         stamp = time.strftime("%H:%M:%S", time.localtime(r.get("t_end", time.time())))
         name = self._preset_name(r.get("freq_hz"))
@@ -1028,7 +1054,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tx_view.append(f"<p style='margin:0 0 8px 0'><span style='color:gray'>"
                             f"{html.escape(head)}</span><br>{body}</p>")
         line = f"{head}  ->  {text}"
-        print("[stt]", line, f"[{r.get('took_s', 0):.1f} s]")
+        print("[stt]", line, f"[{r.get('model', '?')} {r.get('took_s', 0):.1f} s]")
         try:
             with open(USER / "transcripts.txt", "a", encoding="utf-8") as f:
                 f.write(time.strftime("%Y-%m-%d ") + line + "\n")
@@ -1387,6 +1413,7 @@ class MainWindow(QtWidgets.QMainWindow):
             averaging=self.avg_box.currentText(),
             preset_tags=self.tags_chk.isChecked(),
             rec_dir=self.rec_dir_edit.text().strip(),
+            stt_model=self.stt_box.currentData(),
         )
         self.opts.pop("_opened_device", None)
         try:
