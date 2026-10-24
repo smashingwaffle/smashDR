@@ -34,10 +34,11 @@ import settings as cfg
 from dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 HERE = Path(__file__).resolve().parent
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
+TAG_CHARS = 12              # preset tags on the spectrum are cut to this length
 RATES_MSPS = [2.4, 1.92, 1.2, 0.96]
 STEPS_HZ = [1000, 2500, 5000, 6250, 7500, 8330, 10000, 12500, 15000, 20000,
             25000, 50000, 100000, 200000]
@@ -119,7 +120,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: E402
 import pyqtgraph as pg  # noqa: E402
 
 from widgets import FreqDisplay, LevelMeter  # noqa: E402
-from presets import PresetsWindow  # noqa: E402
+from presets import PresetsWindow, load_presets  # noqa: E402
 from p25_live import P25Live  # noqa: E402
 import p25 as p25mod  # noqa: E402
 
@@ -495,6 +496,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.avg = None
         self.wf = np.full((WF_ROWS, FFT_SIZE), -120.0, dtype=np.float32)
         self._wf_rect = None
+        self._tag_items = []
+        try:
+            self._tag_presets = load_presets()
+        except Exception as e:                       # tags are cosmetic, never fatal
+            print("[!] Could not load presets for spectrum tags:", e)
+            self._tag_presets = []
 
         self.reader = SdrReader(sdr, opts)
 
@@ -809,11 +816,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.avg_box.addItems(list(AVERAGING))
         self.avg_box.setCurrentText(opts["averaging"])
 
+        self.tags_chk = QtWidgets.QCheckBox("Label preset frequencies on the spectrum")
+        self.tags_chk.setChecked(bool(opts["preset_tags"]))
+        self.tags_chk.toggled.connect(lambda _on: self._draw_preset_tags())
+
         display = QtWidgets.QGroupBox("Display")
         df = QtWidgets.QFormLayout(display)
         df.addRow("Waterfall range", wf_row)
         df.addRow("Palette", self.pal_box)
         df.addRow("Spectrum averaging", self.avg_box)
+        df.addRow("Preset tags", self.tags_chk)
 
         # --- Recording ---
         self.rec_dir_edit = QtWidgets.QLineEdit(opts["rec_dir"] or str(HERE / "recordings"))
@@ -977,6 +989,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.presets_win is None:
             self.presets_win = PresetsWindow(self._current_for_preset)
             self.presets_win.tune_requested.connect(self._tune_preset)
+            self.presets_win.presets_changed.connect(self._on_presets_changed)
             if not self._restore(self.presets_win, self.opts.get("presets_geometry")):
                 self._place_presets_window(self.presets_win)
             self.presets_win.set_active(self.target_hz, self.mode)
@@ -1153,6 +1166,34 @@ class MainWindow(QtWidgets.QMainWindow):
     # ======================================================================
     # Frames
     # ======================================================================
+    def _on_presets_changed(self, presets):
+        self._tag_presets = presets
+        self._draw_preset_tags()
+
+    def _draw_preset_tags(self):
+        """Short vertical name tags at the top of the spectrum for presets in view."""
+        for it in self._tag_items:
+            self.spec_plot.removeItem(it)
+        self._tag_items = []
+        if not self.tags_chk.isChecked() or self.center_hz is None:
+            return
+        lo = self.center_hz - self.rate_hz / 2
+        hi = self.center_hz + self.rate_hz / 2
+        seen = set()
+        for p in self._tag_presets:
+            f = p["freq_hz"]
+            if not lo < f < hi or f in seen:
+                continue
+            seen.add(f)
+            name = p["name"] if len(p["name"]) <= TAG_CHARS else p["name"][:TAG_CHARS - 1] + "…"
+            color = "#b4a7d6" if p.get("digital") else "#9e9e9e"
+            t = pg.TextItem(name, color=color, angle=90, anchor=(1.0, 0.5))
+            t.setFont(QtGui.QFont("Segoe UI", 8))
+            t.setPos(f / 1e6, -11)
+            t.setZValue(-5)
+            self.spec_plot.addItem(t)
+            self._tag_items.append(t)
+
     def on_frame(self, spec, center, rate, stats):
         if center != self.center_hz or rate != self.rate_hz:
             self.center_hz, self.rate_hz = center, rate
@@ -1165,6 +1206,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._wf_rect = QtCore.QRectF(f0, 0, span, WF_ROWS)
             self.spec_plot.setXRange(f0, f0 + span, padding=0)
             self.band_strip.redraw(center - rate / 2, center + rate / 2)
+            self._draw_preset_tags()
 
         alpha = AVERAGING.get(self.avg_box.currentText(), 0.35)
         self.avg = (1 - alpha) * self.avg + alpha * spec
@@ -1230,6 +1272,7 @@ class MainWindow(QtWidgets.QMainWindow):
             wf_max=self.wf_max.value(),
             palette=self.pal_box.currentText(),
             averaging=self.avg_box.currentText(),
+            preset_tags=self.tags_chk.isChecked(),
             rec_dir=self.rec_dir_edit.text().strip(),
         )
         self.opts.pop("_opened_device", None)
@@ -1247,7 +1290,7 @@ DEFAULTS = {
     "auto_band": True, "squelch_db": 10, "volume": 60, "mute": False,
     "nfm_deemph_us": 750, "wfm_deemph_us": 75, "ctcss_filter": True,
     "wf_auto": True, "wf_min": -90, "wf_max": -40, "palette": "inferno",
-    "averaging": "Medium", "rec_dir": "",
+    "averaging": "Medium", "rec_dir": "", "preset_tags": True,
 }
 
 

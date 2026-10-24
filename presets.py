@@ -454,6 +454,7 @@ class PresetsWindow(QtWidgets.QWidget):
     """Top-level window of preset buttons. Emits tune_requested(preset dict)."""
 
     tune_requested = QtCore.pyqtSignal(dict)
+    presets_changed = QtCore.pyqtSignal(list)
 
     STYLE = """
         QPushButton { text-align: left; padding: 3px 8px; }
@@ -635,6 +636,7 @@ class PresetsWindow(QtWidgets.QWidget):
                         "button_size": self.button_size})
         except OSError as e:
             QtWidgets.QMessageBox.warning(self, "Presets", f"Couldn't save presets: {e}")
+        self.presets_changed.emit(list(self.presets))
 
     def add_current(self):
         cur = self.get_current()
