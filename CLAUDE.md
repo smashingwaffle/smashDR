@@ -89,6 +89,10 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   last fix/home, Tracker) + `ui/aircraft.py` (AdsbReader thread, table, Leaflet
   map via optional PyQt6-WebEngine). `core/capture.py` AsyncCapture shared.
   Tests: `python -m tests.test_adsb` (1090 Riddle vectors + synthetic PPM).
+  UI: map<->list click sync (map logs 'SELECT:<icao>' to the console, caught by
+  _MapPage), info card with route/type/photo from api.adsbdb.com (free, no key,
+  looked up only for the selected plane), airline badges from data/airlines.json
+  (`core/airlines.py`; no real logos: trademarks), altitude colour scale.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 
