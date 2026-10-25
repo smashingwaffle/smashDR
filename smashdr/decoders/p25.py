@@ -267,6 +267,20 @@ def parse_lc(lc: bytes) -> dict:
     return out
 
 
+_G24 = None
+
+
+def _golay24_decode(cw: int):
+    """Golay(24,12) by nearest codeword -> (data12, bit errors)."""
+    global _G24
+    if _G24 is None:
+        _G24 = np.array([pf.golay24_encode(d) for d in range(4096)], dtype=np.uint32)
+    x = _G24 ^ np.uint32(cw)
+    w = np.unpackbits(x.view(np.uint8)).reshape(-1, 32).sum(1)
+    d = int(np.argmin(w))
+    return d, int(w[d])
+
+
 def decode_frame_body(duid: int, bits: np.ndarray) -> dict:
     """Decode what we can from a frame's data bits."""
     info = {}
@@ -289,6 +303,20 @@ def decode_frame_body(duid: int, bits: np.ndarray) -> dict:
                 info["kid"] = (es[10] << 8) | es[11]
                 info["encrypted"] = es[9] != 0x80
         info["imbe"] = np.stack([imbe_codewords(bits, st) for st in VOICE_STARTS])
+    elif duid == 0xF:
+        # TDULC: 12 Golay(24,12) words after the NID -> 24 hexbits -> RS(24,12,13) -> LC
+        hb, gerr = [], 0
+        for w in range(12):
+            st = 112 + 24 * w
+            d, e = _golay24_decode(_bits_to_int(bits[st:st + 24]))
+            hb += [d >> 6, d & 0x3F]
+            gerr += e
+        data, rerr = pf.rs_decode(hb, 12)
+        info.update(golay_errors=gerr, rs_errors=rerr)
+        if data is not None:
+            lc = pf.hexbits_to_bytes(data)
+            info["lc"] = lc.hex()
+            info.update(parse_lc(lc))
     elif duid == 0x0:
         hb, gerr = [], 0
         for w in range(36):
