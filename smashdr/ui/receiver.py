@@ -1048,7 +1048,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 QSlider::groove:horizontal {{ height: 4px; background: #3a3f44; border-radius: 2px; }}
                 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
                     border: 1px solid {c}; }}
-                QLabel a {{ color: {c}; }}
             """)
         for groups in ((radio, audio_box, display, recording), (stt, maps)):
             col = QtWidgets.QVBoxLayout()
