@@ -74,6 +74,8 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   group_calls(); never pass encrypted IMBE to the vocoder.
 - `tests/` synthetic C4FM generator (standard tx filter) + `python -m tests.test_p25`
 - `tools/p25_file.py` frame report for a .cu8 recording
+- `tools/clip_iq.py` cuts one channel of a .cu8 into a 48 kHz stereo IQ WAV
+  (the chat won't take .cu8; Stefaan shares recordings this way)
 - `ui/audio.py` QtMultimedia output, converts to device's preferred format
 - `core/settings.py` user/settings.json store (not in git)
 - `core/transcribe.py` faster-whisper (small.en or large-v3-turbo via Settings, CPU int8, hotwords + junk filter; Stefaan has Iris Xe,
