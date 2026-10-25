@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.5.4"
+VERSION = "0.5.5"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1031,6 +1031,25 @@ class MainWindow(QtWidgets.QMainWindow):
         # two compact columns instead of full-width rows across a wide screen
         cols = QtWidgets.QHBoxLayout()
         cols.setSpacing(16)
+        accents = {radio: "#4fc3f7", audio_box: "#81c784", display: "#ffb74d",
+                   recording: "#e57373", stt: "#ba68c8", maps: "#4db6ac"}
+        for g, c in accents.items():
+            g.setStyleSheet(f"""
+                QGroupBox {{ background: #1f2226; border: 1px solid #33383d;
+                             border-left: 4px solid {c}; border-radius: 6px;
+                             margin-top: 16px; padding: 10px 8px 6px 8px; }}
+                QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 6px;
+                                    color: {c}; font-weight: 600; font-size: 11pt; }}
+                QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
+                    background: {c}; border: 1px solid {c}; border-radius: 3px; }}
+                QSlider::sub-page:horizontal {{ background: {c}; border-radius: 2px; }}
+                QSlider::handle:horizontal {{ background: {c}; width: 12px; margin: -5px 0;
+                                              border-radius: 6px; }}
+                QSlider::groove:horizontal {{ height: 4px; background: #3a3f44; border-radius: 2px; }}
+                QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
+                    border: 1px solid {c}; }}
+                QLabel a {{ color: {c}; }}
+            """)
         for groups in ((radio, audio_box, display, recording), (stt, maps)):
             col = QtWidgets.QVBoxLayout()
             col.setSpacing(10)
