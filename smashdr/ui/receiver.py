@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.5.3"
+VERSION = "0.5.4"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -972,6 +972,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "the first time." if transcribe.available() else
             "Off: run  pip install faster-whisper  in the VSCode terminal, then restart.")
         stt_note.setWordWrap(True)
+        stt_note.setMinimumWidth(420)
         stt_note.setStyleSheet("color: gray;")
         stt = QtWidgets.QGroupBox("Speech-to-text")
         sf = QtWidgets.QFormLayout(stt)
@@ -989,6 +990,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "Empty = Esri dark grey map, no key needed.")
         carto_note.setOpenExternalLinks(True)
         carto_note.setWordWrap(True)
+        carto_note.setMinimumWidth(420)
         carto_note.setStyleSheet("color: gray;")
         self.fa_edit = QtWidgets.QLineEdit(str(opts.get("aeroapi_key", "")))
         self.fa_edit.setPlaceholderText("paste your FlightAware AeroAPI (Personal) key")
@@ -1012,6 +1014,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "then it falls back to adsbdb + the flight-path check.")
         fa_note.setOpenExternalLinks(True)
         fa_note.setWordWrap(True)
+        fa_note.setMinimumWidth(420)
         fa_note.setStyleSheet("color: gray;")
         self._fa_timer = QtCore.QTimer(self)
         self._fa_timer.timeout.connect(self._show_fa_usage)
@@ -1025,12 +1028,31 @@ class MainWindow(QtWidgets.QMainWindow):
         mf.addRow("Monthly cap", fa_row)
         mf.addRow("", fa_note)
 
-        lay = QtWidgets.QVBoxLayout()
-        for g in (radio, audio_box, display, recording, stt, maps):
-            lay.addWidget(g)
-        lay.addStretch(1)
+        # two compact columns instead of full-width rows across a wide screen
+        cols = QtWidgets.QHBoxLayout()
+        cols.setSpacing(16)
+        for groups in ((radio, audio_box, display, recording), (stt, maps)):
+            col = QtWidgets.QVBoxLayout()
+            col.setSpacing(10)
+            for g in groups:
+                g.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred,
+                                QtWidgets.QSizePolicy.Policy.Maximum)
+                for form in g.findChildren(QtWidgets.QFormLayout):
+                    form.setFieldGrowthPolicy(
+                        QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+                    form.setRowWrapPolicy(QtWidgets.QFormLayout.RowWrapPolicy.DontWrapRows)
+                    form.setVerticalSpacing(6)
+                col.addWidget(g)
+            col.addStretch(1)
+            holder = QtWidgets.QWidget()
+            holder.setLayout(col)
+            holder.setMaximumWidth(760)
+            cols.addWidget(holder, 1, QtCore.Qt.AlignmentFlag.AlignTop)
+        cols.addStretch(0)
         inner = QtWidgets.QWidget()
-        inner.setLayout(lay)
+        outer = QtWidgets.QHBoxLayout(inner)
+        outer.addLayout(cols)
+        outer.addStretch(1)
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(inner)
