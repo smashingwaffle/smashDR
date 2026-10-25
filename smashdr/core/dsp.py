@@ -23,10 +23,12 @@ MODES = {
     "NFM": {"half_bw": 8_000.0, "chan_rate": 48_000},
     "AM": {"half_bw": 5_000.0, "chan_rate": 48_000},
     "WFM": {"half_bw": 100_000.0, "chan_rate": 240_000},
-    # digital: handled by p25_live.P25Live, not by Demod
+    # digital: handled by p25_live.P25Live / digital_live.DmrLive / YsfLive, not by Demod
     "P25": {"half_bw": 6_250.0, "chan_rate": 48_000},
+    "DMR": {"half_bw": 6_250.0, "chan_rate": 48_000},
+    "YSF": {"half_bw": 6_250.0, "chan_rate": 48_000},      # Yaesu System Fusion
 }
-DIGITAL_MODES = {"P25"}
+DIGITAL_MODES = {"P25", "DMR", "YSF"}
 
 
 # --------------------------------------------------------------------------

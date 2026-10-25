@@ -24,7 +24,8 @@
 5. IMBE voice via mbelib-neo (ctypes)  <- done (97% frames 0 FEC errors on air)
 5b. Live P25 mode in the receiver (P25Live)  <- done, confirmed on air (Hollenbeck, "better than the SDS200")
 6. Trunking: control channel, follow grants
-7. DMR (4FSK, TDMA bursts, AMBE+2)
+7. DMR (4FSK, TDMA bursts, AMBE+2)  <- done offline + live mode (446.82 CC1 TG 91 decoded, voice ok)
+7b. Fusion / YSF DN  <- done offline + live mode (449.34 AA6RJ/R, VE6DBD; voice ok)
 8. P25 Phase 2
 UX comes after the decode chain works.
 
@@ -34,7 +35,7 @@ main.py                  entry (F5); stays in the root
 smashdr/paths.py         ROOT, data/, user/, recordings/, DLL dirs (root or lib/)
 smashdr/core/            no Qt widgets: dsp, bandplan, settings, vocoder, transcribe
 smashdr/ui/              PyQt6: receiver (main window), presets, widgets, audio, aircraft
-smashdr/decoders/        p25, p25_fec, p25_live, adsb (DMR / Phase 2 go here later)
+smashdr/decoders/        p25, p25_fec, p25_live, dmr, ysf, digital_live, adsb
 data/presets_default.json  seed presets (in git)
 user/                    settings.json, presets.json (not in git; old root copies
                          are moved here on first start)
@@ -74,6 +75,17 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   group_calls(); never pass encrypted IMBE to the vocoder.
 - `tests/` synthetic C4FM generator (standard tx filter) + `python -m tests.test_p25`
 - `tools/p25_file.py` frame report for a .cu8 recording
+- `decoders/dmr.py` DMR: syncs, slot type (no Golay fix yet), BPTC(196,96) with
+  Hamming row/col fixes, RS(12,9) LC check (mask 0x96 header / 0x99 terminator),
+  AMBE 72-bit -> ambe_fr[4][24] (DSD rW/rX/rY/rZ). Voice only after a clear LC
+  (late entry held; embedded LC not done yet).
+- `decoders/ysf.py` Fusion: FICH (K=5 Viterbi, IL 2r+40c, Golay24, CRC16 init 0
+  xorout FFFF over sent bytes), header CSD1, DN DCH callsigns by FN, DN voice
+  (VCH deinterleave argsort(26*(j%4)+j//4), whiten, 27x3 vote + 22 -> 49 bits).
+  VD1 / VW voice not done.
+- `decoders/digital_live.py` DmrLive / YsfLive: shared _SymStream (channelizer +
+  P25 C4FMDemod + absolute-index symbol buffer); same event shape as P25Live
+  plus 'proto'. vocoder.AmbeDecoder: decode_frame (DMR) / decode_params (YSF).
 - `tools/clip_iq.py` cuts one channel of a .cu8 into a 48 kHz stereo IQ WAV
   (the chat won't take .cu8; Stefaan shares recordings this way)
 - `ui/audio.py` QtMultimedia output, converts to device's preferred format

@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.5.5"
+VERSION = "0.6.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -135,6 +135,7 @@ from smashdr.ui.widgets import FreqDisplay, LevelMeter  # noqa: E402
 from smashdr.ui.presets import PresetsWindow, load_presets  # noqa: E402
 from smashdr.ui.aircraft import AircraftTab  # noqa: E402  (before QApplication: WebEngine)
 from smashdr.decoders.p25_live import P25Live  # noqa: E402
+from smashdr.decoders.digital_live import DmrLive, YsfLive  # noqa: E402
 from smashdr.decoders import p25 as p25mod  # noqa: E402
 
 try:
@@ -331,7 +332,8 @@ class SdrReader(QtCore.QThread):
         if self.mode in DIGITAL_MODES:
             self._demod_ok = False
             try:
-                self.p25 = P25Live(rate, off, self._vocoder())
+                live = {"P25": P25Live, "DMR": DmrLive, "YSF": YsfLive}[self.mode]
+                self.p25 = live(rate, off, self._vocoder(self.mode))
             except ValueError as e:
                 self.p25 = None
                 self.status.emit(f"P25 off: {e}")
@@ -344,16 +346,17 @@ class SdrReader(QtCore.QThread):
             self._demod_ok = False
             self.status.emit(f"Audio off: {e}")
 
-    def _vocoder(self):
-        """IMBE decoder, or None (calls still shown) if mbe-neo.dll is missing."""
+    def _vocoder(self, mode="P25"):
+        """IMBE (P25) / AMBE+2 (DMR, Fusion) decoder, or None (calls still shown)
+        if mbe-neo.dll is missing."""
         if self._vocoder_failed:
             return None
         try:
             from smashdr.core import vocoder
-            return vocoder.ImbeDecoder()
+            return vocoder.ImbeDecoder() if mode == "P25" else vocoder.AmbeDecoder()
         except OSError as e:
             self._vocoder_failed = True
-            self.status.emit(f"P25 voice off: {e}. Calls are still shown.")
+            self.status.emit(f"Digital voice off: {e}. Calls are still shown.")
             return None
 
     def _open_recording(self, meta: dict):
@@ -1162,7 +1165,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if hasattr(self, "p25_lbl"):
             self.p25_lbl.setVisible(self.mode in DIGITAL_MODES)
             if self.mode in DIGITAL_MODES and not self.p25_lbl.text():
-                self.p25_lbl.setText("<span style='color:gray'>P25: waiting for a transmission…</span>")
+                self.p25_lbl.setText(f"<span style='color:gray'>{self.mode}: waiting for a transmission…</span>")
 
     # ======================================================================
     # P25 call readout
@@ -1197,10 +1200,15 @@ class MainWindow(QtWidgets.QMainWindow):
         stamp = time.strftime("%H:%M:%S", time.localtime(r.get("t_end", time.time())))
         name = self._preset_name(r.get("freq_hz"))
         who = []
-        if r.get("tgid") is not None:
-            who.append(f"TG {r['tgid']}")
-        if r.get("src") is not None:
-            who.append(f"radio {r['src']}")
+        if r.get("proto") == "YSF":
+            who.append(f"{r.get('src') or '?'} (Fusion)")
+        else:
+            if r.get("tgid") is not None:
+                who.append(f"TG {r['tgid']}")
+            if r.get("src") is not None:
+                who.append(f"radio {r['src']}")
+            if r.get("proto") == "DMR":
+                who.append("DMR")
         if r.get("type") == "analog":
             who.append(r.get("mode", ""))
         head = f"{stamp}  {name}  {'  '.join(who)}  ({r.get('audio_s', 0):.1f} s)"
@@ -1275,21 +1283,33 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if self.presets_win is not None:
             self.presets_win.set_live(None if ev["type"] == "end" else self.target_hz)
+        proto = ev.get("proto", "P25")
         tg = ev.get("tgid")
         src = ev.get("src")
         parts = []
-        if tg is not None:
+        if proto == "YSF":
+            who = f"<b>{html.escape(src or '?')}</b>"
+            if ev.get("dst"):
+                who += f" → {html.escape(ev['dst'])}"
+            parts.append(who)
+            if ev.get("via"):
+                parts.append(f"via {html.escape(ev['via'])}")
+            parts.append(f"Fusion {html.escape(ev.get('mode', ''))}")
+        elif tg is not None:
             parts.append(f"TG <b>{tg}</b>")
         elif ev.get("dst") is not None:
             parts.append(f"to unit <b>{ev['dst']}</b>")
         if src is not None:
             parts.append(f"radio <b>{src}</b>")
-        parts.append(f"NAC 0x{ev['nac']:03X}")
+        if proto == "P25":
+            parts.append(f"NAC 0x{ev['nac']:03X}")
+        elif proto == "DMR":
+            parts.append(f"slot {ev.get('slot')}" + (f"  ·  CC {ev['cc']}" if ev.get("cc") is not None else ""))
         if ev.get("emergency"):
             parts.append("<span style='color:#e53935'><b>EMERGENCY</b></span>")
         if ev.get("encrypted"):
-            enc = (f"<span style='color:#e53935'>ENCRYPTED ({p25mod.algid_name(ev['algid'])}), "
-                   "not decoded</span>")
+            alg = f" ({p25mod.algid_name(ev['algid'])})" if ev.get("algid") is not None else ""
+            enc = f"<span style='color:#e53935'>ENCRYPTED{alg}, not decoded</span>"
         elif ev.get("encrypted") is False:
             enc = "<span style='color:#43a047'>clear</span>"
         else:
@@ -1371,8 +1391,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if p.get("squelch_db") is not None:
             self.sq_slider.setValue(int(p["squelch_db"]))
         digital = (p.get("digital") or "").upper()
-        if digital.startswith("P25") and self.mode != "P25":
-            self._set_mode("P25")
+        want = ("P25" if digital.startswith("P25") else
+                "DMR" if digital.startswith("DMR") or "MOTOTRBO" in digital else
+                "YSF" if any(k in digital for k in ("YSF", "FUSION", "C4FM")) else None)
+        if want and self.mode != want:
+            self._set_mode(want)
         self._tune(p["freq_hz"], apply_band_defaults=False)
         if digital.startswith("P25"):
             self.status_lbl.setText(f"{p['name']}  ·  P25" +
@@ -1380,6 +1403,9 @@ class MainWindow(QtWidgets.QMainWindow):
             if "PHASE II" in digital:
                 self.status_lbl.setText(self.status_lbl.text() +
                                         "  (control channel: frames show, voice is Phase II, not yet)")
+        elif want:
+            self.status_lbl.setText(f"{p['name']}  ·  {want}" +
+                                    (f"  ·  {p['note']}" if p.get("note") else ""))
         elif digital:
             self.status_lbl.setText(f"{p['name']} is {digital}: that decoder isn't built yet, "
                                     "you'll hear digital noise in NFM.")

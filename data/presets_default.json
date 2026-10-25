@@ -828,6 +828,33 @@
    "step_hz": 5000
   },
   {
+   "name": "AA6RJ Fusion",
+   "freq_hz": 449340000,
+   "mode": "NFM",
+   "group": "Ham digital",
+   "step_hz": 12500,
+   "digital": "Fusion",
+   "note": "Multi-mode repeater AA6RJ/R, Fusion DN heard (VE6DBD via WIRES-X) \u00b7 your recording 2026-10-24"
+  },
+  {
+   "name": "DMR 449.4625",
+   "freq_hz": 449462500,
+   "mode": "NFM",
+   "group": "Ham digital",
+   "step_hz": 12500,
+   "digital": "DMR",
+   "note": "DMR repeater, colour code 6 (decoded) \u00b7 your recording 2026-10-24"
+  },
+  {
+   "name": "DMR 446.820",
+   "freq_hz": 446820000,
+   "mode": "NFM",
+   "group": "Ham digital",
+   "step_hz": 12500,
+   "digital": "DMR",
+   "note": "DMR repeater, colour code 1, BrandMeister TG 91 heard \u00b7 your recording 2026-10-24"
+  },
+  {
    "name": "NOAA LA",
    "freq_hz": 162550000,
    "mode": "NFM",

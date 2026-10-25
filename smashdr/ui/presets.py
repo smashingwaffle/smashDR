@@ -388,7 +388,7 @@ class PresetDialog(QtWidgets.QDialog):
         self.note = QtWidgets.QLineEdit(preset.get("note", ""))
         self.digital = QtWidgets.QComboBox()
         self.digital.setEditable(True)
-        self.digital.addItems(["", "P25", "P25 CC", "P25 Phase II CC", "DMR"])
+        self.digital.addItems(["", "P25", "P25 CC", "P25 Phase II CC", "DMR", "Fusion"])
         self.digital.setCurrentText(preset.get("digital", ""))
         self.digital.setToolTip("Digital mode label (for the upcoming decoders). Empty = analog")
 
