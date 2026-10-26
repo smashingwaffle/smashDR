@@ -1028,9 +1028,17 @@ class AircraftTab(QtWidgets.QWidget):
             return "unconfirmed", text + " ?", tip + ". Just set: could be a mis-entry, confirming…"
         if not d:
             return None, "", ""
+        since = p.get("squawk_since")
+        held = ""
+        if since:
+            m = int((time.time() - since) // 60)
+            held = f"\nSet {m} min ago." if m else "\nJust set."
         if d["level"] == "normal":
-            return "normal", sq, d["meaning"]
-        return d["level"], f"{sq} {d['label']}", d["meaning"]
+            return "normal", sq, (f"Squawk {sq}: ATC discrete code\n"
+                                  "A unique code the controller (SoCal Approach / LA Center) gives this\n"
+                                  "flight so radar can tag it. No special meaning; it changes when the\n"
+                                  "flight is handed to another facility." + held)
+        return d["level"], f"{sq} {d['label']}", f"Squawk {sq}: {d['label']}\n{d['meaning']}" + held
 
     def is_emergency(self, p):
         return self.squawk_status(p)[0] == "emergency"
