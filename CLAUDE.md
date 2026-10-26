@@ -131,6 +131,8 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   7600/7700 only count after holding CONFIRM_S=6 s (fat-finger guard) unless the
   aircraft itself flags an emergency; alerts: beep, auto-select, tab turns red,
   user/emergencies.txt log.
+- `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
+  Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 

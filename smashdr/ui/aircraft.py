@@ -14,7 +14,7 @@ import time
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from smashdr.core import airlines, airports, flightaware, squawks
+from smashdr.core import airlines, airports, flightaware, notify, squawks
 from smashdr.core.icao_country import country
 from smashdr.paths import USER
 from smashdr.core.capture import AsyncCapture
@@ -1048,6 +1048,13 @@ class AircraftTab(QtWidgets.QWidget):
                 continue
             self._alerted.add(key)
             QtWidgets.QApplication.beep()
+            if self.opts.get("ntfy_aircraft", True):
+                gm = (f"https://www.google.com/maps/search/?api=1&query={p['lat']:.5f},{p['lon']:.5f}"
+                      if p["lat"] is not None else None)
+                notify.send(self.opts.get("ntfy_topic", ""), f"Aircraft emergency: {name}",
+                            f"{text}\n{tip}\nalt {p['alt']} ft, "
+                            + (f"{p['dist_km'] / KM_PER_MI:.0f} mi from home" if p.get("dist_km") else "no position"),
+                            priority="urgent", tags="airplane,rotating_light", click=gm)
             where = (f"{p['lat']:.4f},{p['lon']:.4f}" if p["lat"] is not None else "no position")
             line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {name}  {p['icao']}  {text}  "
                     f"alt {p['alt']}  {where}  ({tip})")

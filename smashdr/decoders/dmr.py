@@ -169,7 +169,7 @@ def lc_check(lc12: bytes, data_type: int):
 def parse_lc(lc: bytes) -> dict:
     flco = lc[0] & 0x3F
     return {"flco": FLCO.get(flco, flco), "fid": lc[1], "svc": lc[2],
-            "encrypted": bool(lc[2] & 0x40),
+            "encrypted": bool(lc[2] & 0x40), "emergency": bool(lc[2] & 0x80),
             "dst": int.from_bytes(lc[3:6], "big"), "src": int.from_bytes(lc[6:9], "big")}
 
 

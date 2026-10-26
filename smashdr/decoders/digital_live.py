@@ -200,6 +200,7 @@ class DmrLive(_LiveBase):
                 "tgid": c["tgid"] if c["flco"] == "group" else None,
                 "dst": c["tgid"] if c["flco"] != "group" else None,
                 "src": c["src"], "encrypted": c["encrypted"],
+                "emergency": c.get("emergency", False),
                 "duration": c["last"] - c["start"]}
 
     def _start(self, slot, t, events):
@@ -226,7 +227,8 @@ class DmrLive(_LiveBase):
             self._start(slot, t, events)
             c = self.calls[slot]
         before = (c["tgid"], c["src"], c["encrypted"])
-        c.update(tgid=p["dst"], src=p["src"], flco=p["flco"], encrypted=p["encrypted"])
+        c.update(tgid=p["dst"], src=p["src"], flco=p["flco"], encrypted=p["encrypted"],
+                 emergency=p["emergency"])
         if (c["tgid"], c["src"], c["encrypted"]) != before and slot == self.audio_slot:
             events.append(self._snap("update", slot))
 

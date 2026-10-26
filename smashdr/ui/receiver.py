@@ -32,14 +32,14 @@ import numpy as np
 
 from smashdr.core import bandplan
 from smashdr.core import settings as cfg
-from smashdr.core import codes, flightaware, places, transcribe
+from smashdr.core import codes, flightaware, notify, places, transcribe
 from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1032,11 +1032,47 @@ class MainWindow(QtWidgets.QMainWindow):
         mf.addRow("Monthly cap", fa_row)
         mf.addRow("", fa_note)
 
+        # --- Phone alerts (ntfy) ---
+        self.ntfy_edit = QtWidgets.QLineEdit(str(opts.get("ntfy_topic", "")))
+        self.ntfy_edit.setPlaceholderText("your private ntfy topic name")
+        self.ntfy_edit.editingFinished.connect(
+            lambda: self.opts.__setitem__("ntfy_topic", self.ntfy_edit.text().strip()))
+        gen = QtWidgets.QPushButton("New random topic")
+        gen.clicked.connect(lambda: (self.ntfy_edit.setText(notify.random_topic()),
+                                     self.opts.__setitem__("ntfy_topic", self.ntfy_edit.text())))
+        test = QtWidgets.QPushButton("Send test")
+        test.clicked.connect(lambda: notify.send(self.ntfy_edit.text(), "smashDR test",
+                                                 "Phone alerts work.", priority="default",
+                                                 tags="white_check_mark"))
+        nrow = QtWidgets.QHBoxLayout()
+        nrow.addWidget(self.ntfy_edit, 1)
+        nrow.addWidget(gen)
+        nrow.addWidget(test)
+        self.ntfy_air = QtWidgets.QCheckBox("Aircraft emergencies (7500 / 7600 / 7700, emergency status)")
+        self.ntfy_air.setChecked(bool(opts.get("ntfy_aircraft", True)))
+        self.ntfy_air.toggled.connect(lambda v: self.opts.__setitem__("ntfy_aircraft", bool(v)))
+        self.ntfy_radio = QtWidgets.QCheckBox("Radio emergencies (P25 / DMR emergency flag)")
+        self.ntfy_radio.setChecked(bool(opts.get("ntfy_radio", True)))
+        self.ntfy_radio.toggled.connect(lambda v: self.opts.__setitem__("ntfy_radio", bool(v)))
+        ntfy_note = QtWidgets.QLabel(
+            "Free push alerts to your phone: install the <b>ntfy</b> app, tap + and subscribe to the "
+            "same topic name as here, then press Send test. Keep the name private: anyone who "
+            "knows it can read the alerts.")
+        ntfy_note.setWordWrap(True)
+        ntfy_note.setMinimumWidth(420)
+        ntfy_note.setStyleSheet("color: gray;")
+        alerts = QtWidgets.QGroupBox("Phone alerts")
+        af = QtWidgets.QFormLayout(alerts)
+        af.addRow("ntfy topic", nrow)
+        af.addRow("Send for", self.ntfy_air)
+        af.addRow("", self.ntfy_radio)
+        af.addRow("", ntfy_note)
+
         # two compact columns instead of full-width rows across a wide screen
         cols = QtWidgets.QHBoxLayout()
         cols.setSpacing(16)
         accents = {radio: "#4fc3f7", audio_box: "#81c784", display: "#ffb74d",
-                   recording: "#e57373", stt: "#ba68c8", maps: "#4db6ac"}
+                   recording: "#e57373", stt: "#ba68c8", maps: "#4db6ac", alerts: "#ff8a65"}
         for g, c in accents.items():
             g.setStyleSheet(f"""
                 QGroupBox {{ background: #1f2226; border: 1px solid #33383d;
@@ -1053,7 +1089,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
                     border: 1px solid {c}; }}
             """)
-        for groups in ((radio, audio_box, display, recording), (stt, maps)):
+        for groups in ((radio, audio_box, display, recording), (stt, maps, alerts)):
             col = QtWidgets.QVBoxLayout()
             col.setSpacing(10)
             for g in groups:
@@ -1322,6 +1358,13 @@ class MainWindow(QtWidgets.QMainWindow):
             parts.append(f"slot {ev.get('slot')}" + (f"  ·  CC {ev['cc']}" if ev.get("cc") is not None else ""))
         if ev.get("emergency"):
             parts.append("<span style='color:#e53935'><b>EMERGENCY</b></span>")
+            key = (proto, ev.get("tgid"), ev.get("src"), round(time.time() / 120))
+            if self.opts.get("ntfy_radio", True) and key != getattr(self, "_radio_emerg_key", None):
+                self._radio_emerg_key = key
+                notify.send(self.opts.get("ntfy_topic", ""),
+                            f"{proto} emergency on {self._preset_name(self.target_hz)}",
+                            f"TG {ev.get('tgid')}  radio {ev.get('src')}  {self.target_hz / 1e6:.4f} MHz",
+                            priority="urgent", tags="rotating_light")
         if ev.get("encrypted"):
             alg = f" ({p25mod.algid_name(ev['algid'])})" if ev.get("algid") is not None else ""
             enc = f"<span style='color:#e53935'>ENCRYPTED{alg}, not decoded</span>"
@@ -1712,6 +1755,7 @@ class MainWindow(QtWidgets.QMainWindow):
             carto_key=self.carto_edit.text().strip(),
             aeroapi_key=self.fa_edit.text().strip(),
             aeroapi_cap=self.fa_cap.value(),
+            ntfy_topic=self.ntfy_edit.text().strip(),
         )
 
     def _save_opts(self):
