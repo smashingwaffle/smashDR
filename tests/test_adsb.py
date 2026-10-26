@@ -126,8 +126,29 @@ def test_modes():
     assert p["alt"] == 3300 and p["squawk"] == "1200" and not p["adsb"]
 
 
+def test_commb():
+    # pyModeS reference vectors (DF20 Comm-B)
+    want = {"A000083E202CC371C31DE0AA1CCF": ("2,0", "callsign", "KLM1017"),
+            "A000029C85E42F313000007047D3": ("4,0", "sel_alt", 3000),
+            "A000139381951536E024D4CCF6B5": ("5,0", "gs", 438),
+            "A00004128F39F91A7E27C46ADC21": ("6,0", "ias", 252)}
+    for h, (bds, key, val) in want.items():
+        r = adsb.commb(bytes.fromhex(h))
+        assert r and r[0] == bds and r[1][key] == val, (h, r)
+    r = adsb.commb(bytes.fromhex("A000139381951536E024D4CCF6B5"))[1]
+    assert abs(r["track"] - 114.258) < 0.01 and r["tas"] == 424 and abs(r["roll"] - 2.1) < 0.1
+    r = adsb.commb(bytes.fromhex("A00004128F39F91A7E27C46ADC21"))[1]
+    assert abs(r["heading"] - 42.715) < 0.01 and abs(r["mach"] - 0.42) < 0.005 and r["vr_baro"] == -1920
+    for h in ("A0001692185BD5CF400000DFC696", "A800178D10010080F50000D5893C"):   # BDS 4,4 / 1,0
+        assert adsb.commb(bytes.fromhex(h)) is None
+    # a BDS 5,0 that disagrees with the plane's ADS-B track is rejected
+    assert adsb.commb(bytes.fromhex("A000139381951536E024D4CCF6B5"), {"gs": 440, "track": 300}) is None
+    print("comm-B: PASS")
+
+
 if __name__ == "__main__":
     test_decode()
     test_demod()
     test_tracker()
     test_modes()
+    test_commb()

@@ -456,6 +456,7 @@ class InfoCard(QtWidgets.QFrame):
             QLabel#route { font-size: 13pt; color: #e0e0e0; }
             QLabel#sub { font-size: 10pt; color: #9aa0a6; }
             QLabel#live { font-size: 12pt; color: #ffffff; }
+            QLabel#ehs { font-size: 10pt; color: #b0bec5; }
             QLabel#badge { border-radius: 4px; padding: 2px 8px; font-weight: 600; color: #fff; }
         """)
         self.photo = QtWidgets.QLabel()
@@ -477,6 +478,12 @@ class InfoCard(QtWidgets.QFrame):
         self.live = QtWidgets.QLabel()
         self.live.setObjectName("live")
         self.live.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self.ehs = QtWidgets.QLabel()
+        self.ehs.setObjectName("ehs")
+        self.ehs.setWordWrap(True)
+        self.ehs.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self.ehs.setToolTip("Read from the plane's flight computers by ATC radar (Mode S Comm-B,\n"
+                            "DF20/21 replies). Heading is magnetic.")
 
         top = QtWidgets.QHBoxLayout()
         top.addWidget(self.badge)
@@ -489,6 +496,7 @@ class InfoCard(QtWidgets.QFrame):
         text.addWidget(self.type_lbl)
         text.addStretch(1)
         text.addWidget(self.live)
+        text.addWidget(self.ehs)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(10, 10, 12, 10)
         lay.addWidget(self.photo)
@@ -502,6 +510,7 @@ class InfoCard(QtWidgets.QFrame):
         self.route.setText("Click a plane on the map or a row in the list.")
         self.type_lbl.setText("")
         self.live.setText("")
+        self.ehs.setText("")
         self.photo.setPixmap(QtGui.QPixmap())
         self.photo.setText("")
 
@@ -825,6 +834,7 @@ class AircraftTab(QtWidgets.QWidget):
             parts.append(f"<span style='color:{col}'>squawk {html.escape(sqtext)}</span>" if col
                          else f"squawk {html.escape(sqtext)}")
         c.live.setText("  ·  ".join(parts))
+        c.ehs.setText(self._ehs_html(p))
         if lookup:
             self._lookup(p)
 
@@ -1007,6 +1017,55 @@ class AircraftTab(QtWidgets.QWidget):
                 self._get(f"https://api.adsbdb.com/v0/aircraft/{icao}",
                           lambda d, i=icao: self._got_aircraft(i, d))
                 return
+
+    # ---- Comm-B (radar-requested data) ---------------------------------------
+    @staticmethod
+    def _ehs(p, bds, max_age=60.0):
+        e = p.get("ehs") or {}
+        t = e.get("t_" + bds)
+        return e if t is not None and time.time() - t <= max_age else None
+
+    @classmethod
+    def selected_alt(cls, p):
+        e = cls._ehs(p, "4,0")
+        return (e.get("sel_alt") or e.get("fms_alt")) if e else None
+
+    def _ehs_html(self, p):
+        parts = []
+        sel = self.selected_alt(p)
+        if sel:
+            e = p["ehs"]
+            alt = p["alt"]
+            how = ""
+            if alt is not None:
+                how = (" (climbing)" if sel > alt + 150 else " (descending)" if sel < alt - 150
+                       else " (level)")
+            modes = ", ".join(e.get("ap_modes") or [])
+            parts.append(f"<b style='color:#80cbc4'>Autopilot ➜ {sel:,} ft</b>{how}"
+                         + (f" {modes}" if modes else ""))
+        e = self._ehs(p, "6,0")
+        if e:
+            bits = [f"heading {e['heading']:.0f}°"]
+            if e.get("ias"):
+                bits.append(f"IAS {e['ias']} kt")
+            if e.get("mach") and e["mach"] >= 0.3:
+                bits.append(f"Mach {e['mach']:.2f}")
+            parts.append(" · ".join(bits))
+        e = self._ehs(p, "5,0")
+        if e:
+            bits = []
+            if e.get("tas"):
+                bits.append(f"TAS {e['tas']} kt")
+            r = e.get("roll")
+            if r is not None:
+                bits.append("wings level" if abs(r) < 2 else
+                            f"banking {abs(r):.0f}° {'right' if r > 0 else 'left'}")
+            if bits:
+                parts.append(" · ".join(bits))
+        e = self._ehs(p, "4,0")
+        if e and e.get("baro"):
+            parts.append(f"altimeter {e['baro']:.0f} hPa ({e['baro'] * 0.02953:.2f} inHg)")
+        return ("<span style='color:#78909c'>Radar data:</span> " + "  ·  ".join(parts)) if parts else ""
 
     # ---- squawk / emergencies ------------------------------------------------
     @staticmethod
@@ -1234,6 +1293,12 @@ class AircraftTab(QtWidgets.QWidget):
                 airline.setToolTip(f"Registered in {cname}")
 
             alt = _Num(f"{p['alt']:,}" if p["alt"] is not None else "", p["alt"])
+            sel = self.selected_alt(p)
+            if sel and p["alt"] is not None and abs(sel - p["alt"]) > 150:
+                alt.setText(f"{p['alt']:,} ➜ {sel:,}")
+                alt.setToolTip(f"Autopilot set to {sel:,} ft (from ATC radar data)")
+            elif sel:
+                alt.setToolTip(f"Autopilot holding {sel:,} ft")
             alt.setForeground(QtGui.QColor(airlines.alt_color(p["alt"])))
             hdg = _Num(f"{ARROWS[int((p['track'] + 22.5) % 360 // 45)]} {p['track']:.0f}°"
                        if p["track"] is not None else "", p["track"])

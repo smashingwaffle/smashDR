@@ -131,6 +131,10 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   7600/7700 only count after holding CONFIRM_S=6 s (fat-finger guard) unless the
   aircraft itself flags an emergency; alerts: beep, auto-select, tab turns red,
   user/emergencies.txt log.
+  Comm-B (DF20/21 MB): adsb.commb() infers BDS 2,0 callsign / 4,0 selected alt +
+  baro / 5,0 track, GS, TAS, roll / 6,0 magnetic heading, IAS, Mach (pyModeS
+  rules + check vs ADS-B track; ambiguous -> dropped) -> p['ehs'] (+ t_<bds>).
+  Shown in the card ('Radar data') and as 'alt ➜ selected' in the Alt column.
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
   Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,

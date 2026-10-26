@@ -277,6 +277,160 @@ def squawk(msg: bytes):
     return _id13(_bits(msg, 44, 56))               # 13-bit identity field
 
 
+# --------------------------------------------------------------------------
+# Comm-B (DF20/21 MB field): the radar asked for a register; the reply doesn't
+# say which, so it is inferred from the content (like pyModeS). Kept: BDS 2,0
+# callsign, 4,0 selected altitude / baro, 5,0 track & turn, 6,0 heading & speed.
+# --------------------------------------------------------------------------
+_AIS = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ#####_###############0123456789######"
+MAG_DECL = 11.5                       # LA magnetic declination (deg E): BDS 6,0 is magnetic
+
+
+def _mb(msg: bytes) -> int:
+    return int.from_bytes(msg[4:11], "big")
+
+
+def _f(mb: int, a: int, b: int) -> int:
+    """Bits a..b of the 56-bit MB, 1-indexed (as in the ICAO tables)."""
+    return (mb >> (56 - b)) & ((1 << (b - a + 1)) - 1)
+
+
+def _status_ok(mb, st, a, b):
+    """A field whose status bit is 0 must be all zero."""
+    return _f(mb, st, st) or _f(mb, a, b) == 0
+
+
+def _signed(sign, v, n):
+    return v - (1 << n) if sign else v
+
+
+def _angdiff(a, b):
+    return abs((a - b + 180) % 360 - 180)
+
+
+def bds20(mb):
+    if mb >> 48 != 0x20:
+        return None
+    cs = "".join(_AIS[_f(mb, 9 + 6 * i, 14 + 6 * i)] for i in range(8))
+    if "#" in cs or not cs.strip("_ "):
+        return None
+    return {"callsign": cs.replace("_", " ").strip()}
+
+
+def bds40(mb):
+    if mb == 0 or _f(mb, 40, 47) or _f(mb, 52, 53):
+        return None
+    for st, a, b in ((1, 2, 13), (14, 15, 26), (27, 28, 39), (48, 49, 51), (54, 55, 56)):
+        if not _status_ok(mb, st, a, b):
+            return None
+    out = {}
+    for st, a, b, key in ((1, 2, 13, "sel_alt"), (14, 15, 26, "fms_alt")):
+        if _f(mb, st, st):
+            alt = _f(mb, a, b) * 16
+            if alt > 50_000 or abs(alt - round(alt / 100) * 100) > 16:
+                return None                        # selected altitudes are round numbers
+            out[key] = int(round(alt / 100) * 100)
+    if _f(mb, 27, 27):
+        baro = _f(mb, 28, 39) * 0.1 + 800
+        if not 900 <= baro <= 1100:
+            return None
+        out["baro"] = round(baro, 1)
+    if _f(mb, 48, 48):
+        out["ap_modes"] = [n for bit, n in ((49, "VNAV"), (50, "ALT HOLD"), (51, "APPROACH"))
+                           if _f(mb, bit, bit)]
+    return out if ("sel_alt" in out or "fms_alt" in out) else None
+
+
+def bds50(mb):
+    if mb == 0:
+        return None
+    for st, a, b in ((1, 2, 11), (12, 13, 23), (24, 25, 34), (35, 36, 45), (46, 47, 56)):
+        if not _status_ok(mb, st, a, b):
+            return None
+    if not (_f(mb, 12, 12) and _f(mb, 24, 24)):
+        return None
+    out = {"track": _signed(_f(mb, 13, 13), _f(mb, 14, 23), 10) * 90 / 512 % 360,
+           "gs": _f(mb, 25, 34) * 2}
+    if _f(mb, 1, 1):
+        out["roll"] = _signed(_f(mb, 2, 2), _f(mb, 3, 11), 9) * 45 / 256
+        if abs(out["roll"]) > 35:
+            return None
+    if _f(mb, 35, 35):
+        out["turn_rate"] = _signed(_f(mb, 36, 36), _f(mb, 37, 45), 9) * 8 / 256
+    if _f(mb, 46, 46):
+        out["tas"] = _f(mb, 47, 56) * 2
+        if out["tas"] > 600 or abs(out["tas"] - out["gs"]) > 200:
+            return None
+    if out["gs"] > 600:
+        return None
+    return out
+
+
+def bds60(mb):
+    if mb == 0:
+        return None
+    for st, a, b in ((1, 2, 12), (13, 14, 23), (24, 25, 34), (35, 36, 45), (46, 47, 56)):
+        if not _status_ok(mb, st, a, b):
+            return None
+    if not _f(mb, 1, 1) or not (_f(mb, 13, 13) or _f(mb, 24, 24)):
+        return None
+    out = {"heading": _signed(_f(mb, 2, 2), _f(mb, 3, 12), 10) * 90 / 512 % 360}
+    if _f(mb, 13, 13):
+        out["ias"] = _f(mb, 14, 23)
+        if not 0 < out["ias"] <= 500:
+            return None
+    if _f(mb, 24, 24):
+        out["mach"] = _f(mb, 25, 34) * 2.048 / 512
+        if not 0 < out["mach"] <= 1:
+            return None
+    if "ias" in out and "mach" in out and not 250 <= out["ias"] / out["mach"] <= 700:
+        return None
+    for st, sg, a, b, key in ((35, 36, 37, 45, "vr_baro"), (46, 47, 48, 56, "vr_ins")):
+        if _f(mb, st, st):
+            out[key] = _signed(_f(mb, sg, sg), _f(mb, a, b), 9) * 32
+            if abs(out[key]) > 6000:
+                return None
+    return out
+
+
+def commb(msg: bytes, ref: dict = None):
+    """(bds, fields) for a DF20/21 reply, or None when empty / ambiguous.
+    ref: the plane's state (ADS-B gs/track, earlier Comm-B) to pick between
+    registers that fit the same bits."""
+    mb = _mb(msg)
+    if mb == 0:
+        return None
+    r = bds20(mb)
+    if r:
+        return "2,0", r
+    cand = {k: v for k, v in (("4,0", bds40(mb)), ("5,0", bds50(mb)), ("6,0", bds60(mb))) if v}
+    if not cand:
+        return None
+    ref = ref or {}
+    gs, trk = ref.get("gs"), ref.get("track")
+    if gs is None:                       # no ADS-B: fall back to earlier Comm-B track/speed
+        e = ref.get("ehs") or {}
+        gs, trk = e.get("gs"), e.get("track")
+    alt = ref.get("alt")
+    if "5,0" in cand and gs is not None and trk is not None:
+        c = cand["5,0"]
+        if abs(c["gs"] - gs) > 40 or _angdiff(c["track"], trk) > 20:
+            del cand["5,0"]
+    if "6,0" in cand and trk is not None:
+        c = cand["6,0"]
+        if _angdiff(c["heading"] + MAG_DECL, trk) > 45:
+            del cand["6,0"]
+    if "6,0" in cand and gs is not None and "ias" in cand["6,0"]:
+        if cand["6,0"]["ias"] > gs + 150 or (alt is not None and alt < 10_000
+                                             and abs(cand["6,0"]["ias"] - gs) > 120):
+            del cand["6,0"]
+    if len(cand) > 1 and trk is None:
+        return None                      # can't tell them apart yet
+    if len(cand) != 1:
+        return None
+    return next(iter(cand.items()))
+
+
 def distance_km(lat1, lon1, lat2, lon2):
     p1, p2 = math.radians(lat1), math.radians(lat2)
     dp, dl = p2 - p1, math.radians(lon2 - lon1)
@@ -303,7 +457,7 @@ class Tracker:
         if p is None:
             p = self.planes[a] = {"icao": a, "callsign": "", "lat": None, "lon": None,
                                   "alt": None, "gs": None, "track": None, "vrate": None,
-                                  "squawk": None, "rotor": False, "hover": False, "msgs": 0,
+                                  "squawk": None, "ehs": {}, "rotor": False, "hover": False, "msgs": 0,
                                   "adsb": False, "emergency_state": 0, "squawk_since": None,
                                   "first": t, "last": t, "pos_t": None, "trail": []}
         p["msgs"] += 1
@@ -313,12 +467,16 @@ class Tracker:
             alt = ac13_altitude(msg)
             if alt is not None and not p["adsb"]:
                 p["alt"] = alt
+            if df == 20:
+                self._commb(p, msg, t)
             return p
         if df in (5, 21):
             sq = id13_squawk(msg)
             if sq != p["squawk"]:
                 p["squawk_since"] = t
             p["squawk"] = sq
+            if df == 21:
+                self._commb(p, msg, t)
             return p
         if df == 11:
             return p
@@ -360,6 +518,20 @@ class Tracker:
             if _bits(msg, 38, 40) == 1:
                 p["emergency_state"] = _bits(msg, 41, 43)      # 0 none, 1-6 kind
         return p
+
+    def _commb(self, p, msg, t):
+        r = commb(msg, p)
+        if r is None:
+            return
+        bds, f = r
+        if bds == "2,0" and not p["callsign"]:
+            p["callsign"] = f["callsign"]
+        ehs = dict(p["ehs"])                  # replaced, never mutated (UI holds copies)
+        ehs.update(f)
+        ehs["t_" + bds] = t
+        p["ehs"] = ehs
+        if bds == "5,0" and not p["adsb"]:    # transponder-only: speed / track from radar data
+            p["gs"], p["track"] = f["gs"], f["track"]
 
     def expire(self, t: float, after_s: float = 90.0):
         for a in [a for a, p in self.planes.items() if t - p["last"] > after_s]:
