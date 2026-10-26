@@ -1,0 +1,86 @@
+{
+ "note": "Transponder (Mode A) codes -> meaning. 'range' entries cover a block. US conventions (FAA JO 7110.66); 'level': emergency / special / vfr / normal.",
+ "codes": [
+  {
+   "code": "7500",
+   "label": "HIJACK",
+   "meaning": "Unlawful interference (hijack)",
+   "level": "emergency"
+  },
+  {
+   "code": "7600",
+   "label": "RADIO FAIL",
+   "meaning": "Lost two-way radio communication",
+   "level": "emergency"
+  },
+  {
+   "code": "7700",
+   "label": "EMERGENCY",
+   "meaning": "General emergency",
+   "level": "emergency"
+  },
+  {
+   "code": "7400",
+   "label": "DRONE LOST LINK",
+   "meaning": "Unmanned aircraft lost its control link",
+   "level": "emergency"
+  },
+  {
+   "code": "1200",
+   "label": "VFR",
+   "meaning": "Flying VFR, not receiving ATC services",
+   "level": "vfr"
+  },
+  {
+   "code": "1202",
+   "label": "Glider",
+   "meaning": "VFR glider, not in contact with ATC",
+   "level": "vfr"
+  },
+  {
+   "code": "1255",
+   "label": "Firefighting",
+   "meaning": "Aircraft engaged in firefighting",
+   "level": "special"
+  },
+  {
+   "code": "1276",
+   "label": "ADIZ, no contact",
+   "meaning": "Penetrating an ADIZ without ATC contact",
+   "level": "special"
+  },
+  {
+   "code": "1277",
+   "label": "Search & rescue",
+   "meaning": "VFR search and rescue flight",
+   "level": "special"
+  },
+  {
+   "code": "4000",
+   "label": "Military",
+   "meaning": "Military aircraft in warning / restricted areas",
+   "level": "special"
+  },
+  {
+   "code": "7777",
+   "label": "Interceptor",
+   "meaning": "Military interceptor on an active air-defence mission",
+   "level": "special"
+  },
+  {
+   "code": "0000",
+   "label": "Invalid",
+   "meaning": "Not a valid assignment (often a transponder fault)",
+   "level": "special"
+  },
+  {
+   "range": [
+    "4400",
+    "4477"
+   ],
+   "label": "High-altitude special",
+   "meaning": "Reserved for special high-altitude flights (above FL600)",
+   "level": "special"
+  }
+ ]
+}

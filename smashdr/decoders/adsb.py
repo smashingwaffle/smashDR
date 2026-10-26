@@ -304,7 +304,7 @@ class Tracker:
             p = self.planes[a] = {"icao": a, "callsign": "", "lat": None, "lon": None,
                                   "alt": None, "gs": None, "track": None, "vrate": None,
                                   "squawk": None, "rotor": False, "hover": False, "msgs": 0,
-                                  "adsb": False,
+                                  "adsb": False, "emergency_state": 0, "squawk_since": None,
                                   "first": t, "last": t, "pos_t": None, "trail": []}
         p["msgs"] += 1
         p["last"] = t
@@ -315,7 +315,10 @@ class Tracker:
                 p["alt"] = alt
             return p
         if df in (5, 21):
-            p["squawk"] = id13_squawk(msg)
+            sq = id13_squawk(msg)
+            if sq != p["squawk"]:
+                p["squawk_since"] = t
+            p["squawk"] = sq
             return p
         if df == 11:
             return p
@@ -351,7 +354,11 @@ class Tracker:
         elif tc == 28:
             sq = squawk(msg)
             if sq:
+                if sq != p["squawk"]:
+                    p["squawk_since"] = t
                 p["squawk"] = sq
+            if _bits(msg, 38, 40) == 1:
+                p["emergency_state"] = _bits(msg, 41, 43)      # 0 none, 1-6 kind
         return p
 
     def expire(self, t: float, after_s: float = 90.0):

@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -551,6 +551,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.aircraft_tab = AircraftTab(opts, list_devices(),
                                         int(opts.get("_opened_device", opts["device_index"])))
         tabs.addTab(self.aircraft_tab, "Aircraft")
+        self.aircraft_tab.emergency.connect(self._aircraft_emergency)
         tabs.addTab(self._build_settings_tab(), "Settings")
         tabs.setCurrentIndex(min(max(int(opts.get("tab", 0)), 0), tabs.count() - 1))
         # save settings every 30 s too, so a crash or power cut doesn't lose them
@@ -1170,6 +1171,20 @@ class MainWindow(QtWidgets.QMainWindow):
     # ======================================================================
     # P25 call readout
     # ======================================================================
+    def _aircraft_emergency(self, text):
+        """Flash the Aircraft tab while any plane has a confirmed emergency squawk."""
+        i = self.tabs.indexOf(self.aircraft_tab)
+        bar = self.tabs.tabBar()
+        if text:
+            self.tabs.setTabText(i, "Aircraft ⚠")
+            bar.setTabTextColor(i, QtGui.QColor("#ff5252"))
+            if text != getattr(self, "_last_emerg", ""):
+                self.status_lbl.setText(f"⚠ Aircraft emergency: {text}")
+        else:
+            self.tabs.setTabText(i, "Aircraft")
+            bar.setTabTextColor(i, bar.palette().color(QtGui.QPalette.ColorRole.WindowText))
+        self._last_emerg = text
+
     def _show_fa_usage(self):
         if hasattr(self, "aircraft_tab"):
             used, cap = self.aircraft_tab.fa_usage()

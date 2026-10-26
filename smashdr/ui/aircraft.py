@@ -6,6 +6,7 @@ second it emits a snapshot. AircraftTab shows a sortable table and, when
 PyQt6-WebEngine is installed, a Leaflet map (Esri dark grey canvas, or OSM).
 """
 
+import html
 import json
 import queue
 import re
@@ -13,7 +14,7 @@ import time
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from smashdr.core import airlines, airports, flightaware
+from smashdr.core import airlines, airports, flightaware, squawks
 from smashdr.core.icao_country import country
 from smashdr.paths import USER
 from smashdr.core.capture import AsyncCapture
@@ -33,7 +34,8 @@ except ImportError:
 READ_BYTES = 262144                     # 65 ms at 2 MS/s
 DEFAULT_HOME = (34.087, -118.183)       # roughly 90032; set yours on the tab
 KM_PER_MI = 1.609344
-EMERGENCY = {"7500": "HIJACK", "7600": "RADIO FAIL", "7700": "EMERGENCY"}
+CONFIRM_S = 6.0         # an emergency squawk must hold this long (fat-finger guard)
+SQ_COLOURS = {"emergency": "#ff5252", "special": "#ffb74d", "vfr": "#90a4ae"}
 # helicopter makers / models as they appear in aircraft-type text
 HELI_RX = re.compile(
     r"\b(helicopter|rotorcraft|bell|robinson|eurocopter|sikorsky|agusta|leonardo|"
@@ -269,8 +271,8 @@ function selectPlane(icao, center){
 map.on('click', function(){ if (selected){ selectPlane(null); console.log('SELECT:'); } });
 </script></body></html>"""
 
-COLS = ["Flight", "Airline", "LA airport", "Alt ft", "Speed kt", "Hdg", "V/S fpm", "Dist mi",
-        "Squawk", "ICAO", "Seen"]
+COLS = ["Flight", "Airline", "Squawk", "LA airport", "Alt ft", "Speed kt", "Hdg", "V/S fpm", "Dist mi",
+        "ICAO", "Seen"]
 C_ICAO = COLS.index("ICAO")
 ARROWS = "↑↗→↘↓↙←↖"
 
@@ -505,8 +507,11 @@ class InfoCard(QtWidgets.QFrame):
 
 
 class AircraftTab(QtWidgets.QWidget):
+    emergency = QtCore.pyqtSignal(str)       # summary text, "" when none are active
+
     def __init__(self, opts: dict, devices: list, busy_index: int, parent=None):
         super().__init__(parent)
+        self._alerted = set()                # (icao, code / state) already announced
         self.opts = opts
         self.busy_index = busy_index            # the scanner's dongle
         self.reader = None
@@ -814,10 +819,11 @@ class AircraftTab(QtWidgets.QWidget):
             parts.append(("▲ " if p["vrate"] > 0 else "▼ ") + f"{abs(p['vrate']):,} fpm")
         if dist is not None:
             parts.append(f"{dist:.1f} mi away")
-        if p["squawk"]:
-            sq = p["squawk"]
-            parts.append(f"<span style='color:#ff5252'>{sq} {EMERGENCY[sq]}</span>"
-                         if sq in EMERGENCY else f"squawk {sq}")
+        state, sqtext, sqtip = self.squawk_status(p)
+        if sqtext:
+            col = SQ_COLOURS.get("emergency" if state in ("emergency", "unconfirmed") else state)
+            parts.append(f"<span style='color:{col}'>squawk {html.escape(sqtext)}</span>" if col
+                         else f"squawk {html.escape(sqtext)}")
         c.live.setText("  ·  ".join(parts))
         if lookup:
             self._lookup(p)
@@ -1002,6 +1008,59 @@ class AircraftTab(QtWidgets.QWidget):
                           lambda d, i=icao: self._got_aircraft(i, d))
                 return
 
+    # ---- squawk / emergencies ------------------------------------------------
+    @staticmethod
+    def squawk_status(p):
+        """-> (state, text, tooltip) with state 'emergency' | 'unconfirmed' | level | None."""
+        sq = p.get("squawk") or ""
+        es = p.get("emergency_state") or 0
+        d = squawks.describe(sq)
+        kind = squawks.EMERGENCY_STATE.get(es)
+        if sq in squawks.EMERGENCY_CODES or es:
+            held = time.time() - (p.get("squawk_since") or 0)
+            if sq in squawks.EMERGENCY_CODES:
+                text = f"{sq} {d['label']}" + (f" · {kind}" if kind and kind != "general emergency" else "")
+            else:                                  # emergency flagged by the aircraft itself
+                text = f"{sq} · {(kind or 'emergency').upper()}".strip(" ·")
+            tip = (d["meaning"] if d else "Emergency") + (f"; aircraft reports: {kind}" if kind else "")
+            if es or held >= CONFIRM_S:
+                return "emergency", text, tip
+            return "unconfirmed", text + " ?", tip + ". Just set: could be a mis-entry, confirming…"
+        if not d:
+            return None, "", ""
+        if d["level"] == "normal":
+            return "normal", sq, d["meaning"]
+        return d["level"], f"{sq} {d['label']}", d["meaning"]
+
+    def is_emergency(self, p):
+        return self.squawk_status(p)[0] == "emergency"
+
+    def _check_emergencies(self, planes):
+        active = []
+        for p in planes:
+            state, text, tip = self.squawk_status(p)
+            if state != "emergency":
+                continue
+            name = p["callsign"] or p["icao"]
+            active.append(f"{name} {text}")
+            key = (p["icao"], p.get("squawk"), p.get("emergency_state"))
+            if key in self._alerted:
+                continue
+            self._alerted.add(key)
+            QtWidgets.QApplication.beep()
+            where = (f"{p['lat']:.4f},{p['lon']:.4f}" if p["lat"] is not None else "no position")
+            line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {name}  {p['icao']}  {text}  "
+                    f"alt {p['alt']}  {where}  ({tip})")
+            print("[EMERGENCY]", line)
+            try:
+                with open(USER / "emergencies.txt", "a", encoding="utf-8") as f:
+                    f.write(line + "\n")
+            except OSError:
+                pass
+            self._select(p["icao"], center=True)
+            self._select_row(p["icao"])
+        self.emergency.emit("  ·  ".join(active))
+
     def is_heli(self, p):
         info = self._info.get(p["icao"])
         return bool(p["rotor"] or p.get("hover") or (info and info.get("heli")))
@@ -1077,8 +1136,10 @@ class AircraftTab(QtWidgets.QWidget):
         seen = airports.infer(p)
         if seen:
             bits += [seen[1], seen[2], "arriving" if seen[0] == "arr" else "departed"]
-        if p["squawk"] in EMERGENCY:
-            bits += ["emergency", EMERGENCY[p["squawk"]]]
+        state, sqtext, sqtip = self.squawk_status(p)
+        bits += [sqtext, sqtip]
+        if state in ("emergency", "unconfirmed"):
+            bits += ["emergency"]
         info = self._info.get(p["icao"])
         if info:
             bits.append(info.get("text"))
@@ -1114,7 +1175,7 @@ class AircraftTab(QtWidgets.QWidget):
         if HAVE_WEB and self._map_ready:
             js = [{"icao": p["icao"], "flight": p["callsign"] or "", "lat": p["lat"],
                    "lon": p["lon"], "alt": p["alt"], "track": p["track"],
-                   "rotor": self.is_heli(p), "emergency": p["squawk"] in EMERGENCY,
+                   "rotor": self.is_heli(p), "emergency": self.is_emergency(p),
                    "trail": p["trail"]} for p in shown]
             self._js(f"update({json.dumps(js)})")
 
@@ -1130,6 +1191,7 @@ class AircraftTab(QtWidgets.QWidget):
         self._refresh()
         if self._selected in self._planes:
             self._update_card()
+        self._check_emergencies(planes)
 
     def _fill_table(self, planes):
         bold = QtGui.QFont()
@@ -1139,7 +1201,7 @@ class AircraftTab(QtWidgets.QWidget):
         self.table.setRowCount(len(planes))
         for row, p in enumerate(planes):
             dist_mi = p["dist_km"] / KM_PER_MI if p["dist_km"] is not None else None
-            sq = p["squawk"] or ""
+            sq_state, sq_text, sq_tip = self.squawk_status(p)
             code, name, num = airlines.split(p["callsign"])
             flight = QtWidgets.QTableWidgetItem(p["callsign"] or "—")
             flight.setFont(bold)
@@ -1174,19 +1236,27 @@ class AircraftTab(QtWidgets.QWidget):
                                 " (from its flight path)")
             else:
                 port = QtWidgets.QTableWidgetItem("")
+            sqi = QtWidgets.QTableWidgetItem(sq_text)
+            if sq_tip:
+                sqi.setToolTip(sq_tip)
+            col = SQ_COLOURS.get("emergency" if sq_state in ("emergency", "unconfirmed") else sq_state)
+            if col:
+                sqi.setForeground(QtGui.QColor(col))
+            if sq_state == "emergency":
+                sqi.setFont(bold)
             cells = [
-                flight, airline, port, alt,
+                flight, airline, sqi, port, alt,
                 _Num(f"{p['gs']:.0f}" if p["gs"] is not None else "", p["gs"]),
                 hdg, vs,
                 _Num(f"{dist_mi:.1f}" if dist_mi is not None else "", dist_mi),
-                QtWidgets.QTableWidgetItem(sq + (f" {EMERGENCY[sq]}" if sq in EMERGENCY else "")),
                 QtWidgets.QTableWidgetItem(p["icao"]),
                 _Num(f"{p['age']:.0f}s", p["age"]),
             ]
             cells[C_ICAO].setForeground(QtGui.QColor("#8a9399"))
-            if sq in EMERGENCY:
+            if sq_state == "emergency":
                 for it in cells:
                     it.setForeground(QtGui.QColor("#ff5252"))
+                    it.setBackground(QtGui.QColor(90, 20, 20))
             for col, it in enumerate(cells):
                 self.table.setItem(row, col, it)
         self.table.setSortingEnabled(True)

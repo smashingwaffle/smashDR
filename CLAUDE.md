@@ -126,6 +126,11 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   Helicopters: emitter category 7, hover (<35 kt above 400 ft), or adsbdb type
   text (HELI_RX); types looked up in the background (<1/s), cached 30 days in
   user/cache/aircraft.json; photos only fetched for the selected plane.
+  Squawks: `core/squawks.py` + `data/squawks.json` (meanings), Squawk column next
+  to Airline; ADS-B TC28 emergency state (medical, min fuel...) decoded; 7500/
+  7600/7700 only count after holding CONFIRM_S=6 s (fat-finger guard) unless the
+  aircraft itself flags an emergency; alerts: beep, auto-select, tab turns red,
+  user/emergencies.txt log.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
   and a conflicting change breaks the F5 `git pull --ff-only`.
 
