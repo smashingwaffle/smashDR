@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.6.8"
+VERSION = "0.6.9"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -543,9 +543,12 @@ class TagStrip(pg.PlotWidget):
 
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
-        self.redraw()
+        if hasattr(self, "_items"):          # Qt resizes during __init__, before our state exists
+            self.redraw()
 
     def redraw(self):
+        if not hasattr(self, "_items"):
+            return
         for it in self._items:
             self.removeItem(it)
         self._items, self._hits = [], []
