@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.7.2"
+VERSION = "0.7.3"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -550,6 +550,8 @@ class TagStrip(pg.PlotWidget):
 
     def set_tags(self, presets, lo_hz, hi_hz):
         self._presets, self._span = presets, (lo_hz, hi_hz)
+        if hi_hz > lo_hz:
+            self.setXRange(lo_hz / 1e6, hi_hz / 1e6, padding=0)
         self.redraw()
 
     def resizeEvent(self, ev):
@@ -833,8 +835,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wf_plot.addItem(self.wf_marker)
         self.spec_plot.hideAxis("bottom")
 
+        # not x-linked: pyqtgraph links by screen position and the strip fed ranges back
+        # into the waterfall/spectrum; set_tags() gives it the span explicitly
         self.tag_strip = TagStrip(self._wheel_tune, self._tag_tooltip, self._tune_preset)
-        self.tag_strip.setXLink(self.wf_plot)
         for p in (self.band_strip, self.spec_plot, self.wf_plot):
             p.scene().sigMouseClicked.connect(
                 lambda ev, plot=p: self._plot_clicked(ev, plot))
@@ -1285,6 +1288,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if snap:
             hz = round(hz / self.step_hz) * self.step_hz
         hz = int(round(min(max(hz, 24e6), 1766e6)))
+        if self.opts.get("debug_tune", True):          # temporary: chasing the click-jump bug
+            import inspect
+            caller = inspect.stack()[1].function
+            view = self.spec_plot.getViewBox().viewRange()[0] if hasattr(self, "spec_plot") else None
+            print(f"[tune] {hz / 1e6:.4f} MHz from {caller}  centre "
+                  f"{(self.center_hz or 0) / 1e6:.4f}  view "
+                  f"{'%.4f-%.4f' % tuple(view) if view else '?'}", flush=True)
         if hasattr(self, "cc_lbl") and abs(hz - self.target_hz) > 1000:
             self.cc_lbl.clear()                     # another channel: its own system info follows
             self.cc_lbl.hide()
@@ -1561,6 +1571,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _plot_clicked(self, ev, plot):
         vb = plot.plotItem.vb
+        print(f"[click] {type(plot).__name__} double={ev.double()} "
+              f"x={vb.mapSceneToView(ev.scenePos()).x():.4f}", flush=True)
         # a double click (or a second click while the span is still moving) would be
         # mapped onto the new span and tune somewhere else
         if ev.double() or time.time() < getattr(self, "_click_block_until", 0.0):
