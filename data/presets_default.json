@@ -1910,6 +1910,42 @@
       "group": "Interop",
       "step_hz": 12500,
       "note": "FIREMARS (LAFD F24) · 156.7 PL · interceptradio.com"
+    },
+    {
+      "name": "SYS 0D5 CC1",
+      "freq_hz": 851062500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "digital": "P25",
+      "note": "P25 control channel · WACN 92065 system 0D5 (seen on air by Stefaan, 2026-10-26)"
+    },
+    {
+      "name": "SYS 0D5 CC2",
+      "freq_hz": 851112500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "digital": "P25",
+      "note": "P25 control channel · WACN 92065 system 0D5 (seen on air by Stefaan, 2026-10-26)"
+    },
+    {
+      "name": "SYS 0D5 CC3",
+      "freq_hz": 851187500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "digital": "P25",
+      "note": "P25 control channel · WACN 92065 system 0D5 (seen on air by Stefaan, 2026-10-26)"
+    },
+    {
+      "name": "SYS 0D5 CC4",
+      "freq_hz": 851250000,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "digital": "P25",
+      "note": "P25 control channel · WACN 92065 system 0D5 (seen on air by Stefaan, 2026-10-26)"
     }
   ],
   "collapsed": [

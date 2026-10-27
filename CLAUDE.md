@@ -23,7 +23,7 @@
 4. Frame types HDU/LDU/TDU, FEC (Hamming, Golay, RS)  <- done, verified on air; TSBK done (857.1625 / 857.4625)
 5. IMBE voice via mbelib-neo (ctypes)  <- done (97% frames 0 FEC errors on air)
 5b. Live P25 mode in the receiver (P25Live)  <- done, confirmed on air (Hollenbeck, "better than the SDS200")
-6. Trunking: control channel, follow grants
+6. Trunking: control channel, follow grants  <- P25 in progress: P25Trunk follows grants inside the span
 7. DMR (4FSK, TDMA bursts, AMBE+2)  <- done offline + live mode (446.82 CC1 TG 91 decoded, voice ok)
 7b. Fusion / YSF DN  <- done offline + live mode (449.34 AA6RJ/R, VE6DBD; voice ok)
 8. P25 Phase 2
@@ -65,6 +65,11 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   = 360 dibits max, framer resumes after the TSBK with LB set (_used).
   Verified: 857.4625 = CCCS 45C site 21 grant TG 193 -> 857.9625 matched the voice
   channel's LDU (AES). 857.1625 = BEE00-346 RFSS 1 site 6 (has Phase 2 idens).
+- `decoders/p25_trunk.py` P25Trunk (receiver's P25 mode): P25Live on the tuned channel; if it's a
+  control channel, each active grant inside the span (not encrypted, not Phase 2, max 3)
+  gets its own P25Live on the same IQ ("option B", no retuning). First clear call owns
+  the audio; TGs seen encrypted aren't followed again. cc event grants carry 'state'.
+  UI: cc_lbl under p25_lbl. 0.22x realtime CPU on the 857 recording (sandbox).
 - `decoders/p25_fec.py` Hamming(10,6), Golay(24,12)/(18,6), RS over GF(64) (0x43,
   FCR 1) encode + decode. Matches the air: 0 corrections on clean frames.
 - `decoders/p25_live.py` P25Live: streaming chain + call state -> 48 kHz audio + events

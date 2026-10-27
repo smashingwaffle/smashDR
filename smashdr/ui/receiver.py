@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.6.10"
+VERSION = "0.7.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -135,6 +135,7 @@ from smashdr.ui.widgets import FreqDisplay, LevelMeter  # noqa: E402
 from smashdr.ui.presets import PresetsWindow, load_presets  # noqa: E402
 from smashdr.ui.aircraft import AircraftTab  # noqa: E402  (before QApplication: WebEngine)
 from smashdr.decoders.p25_live import P25Live  # noqa: E402
+from smashdr.decoders.p25_trunk import P25Trunk  # noqa: E402
 from smashdr.decoders.digital_live import DmrLive, YsfLive  # noqa: E402
 from smashdr.decoders import p25 as p25mod  # noqa: E402
 
@@ -266,7 +267,9 @@ class SdrReader(QtCore.QThread):
             self._configure_demod()
         elif "center" in p or "target" in p:
             off = self.target_hz - self.sdr.center_freq
-            if self.p25 is not None:
+            if isinstance(self.p25, P25Trunk):
+                self.p25.set_offset(off, float(self.sdr.center_freq))
+            elif self.p25 is not None:
                 self.p25.set_offset(off)
             elif self._demod_ok:
                 self.demod.set_offset(off)
@@ -295,7 +298,8 @@ class SdrReader(QtCore.QThread):
         elif self._call_meta is not None:
             self._call_meta.update(ev)
         if ev["type"] == "end" and self._call_pcm is not None:
-            meta = dict(self._call_meta, freq_hz=self.target_hz, t_end=time.time())
+            meta = dict(self._call_meta, t_end=time.time())
+            meta["freq_hz"] = meta.pop("freq", None) or self.target_hz
             if self._call_pcm and meta.get("encrypted") is False:
                 self.transcriber.submit(np.concatenate(self._call_pcm), meta)
             self._call_pcm = self._call_meta = None
@@ -332,8 +336,12 @@ class SdrReader(QtCore.QThread):
         if self.mode in DIGITAL_MODES:
             self._demod_ok = False
             try:
-                live = {"P25": P25Live, "DMR": DmrLive, "YSF": YsfLive}[self.mode]
-                self.p25 = live(rate, off, self._vocoder(self.mode))
+                if self.mode == "P25":            # follows grants when it's a control channel
+                    self.p25 = P25Trunk(rate, off, float(self.sdr.center_freq),
+                                        lambda: self._vocoder("P25"))
+                else:
+                    live = {"DMR": DmrLive, "YSF": YsfLive}[self.mode]
+                    self.p25 = live(rate, off, self._vocoder(self.mode))
             except ValueError as e:
                 self.p25 = None
                 self.status.emit(f"P25 off: {e}")
@@ -914,6 +922,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.p25_lbl.setFont(f2)
         self.p25_lbl.setMinimumHeight(28)
         lay.addWidget(self.p25_lbl)
+        self.cc_lbl = QtWidgets.QLabel("")         # control channel + grants being followed
+        self.cc_lbl.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self.cc_lbl.setWordWrap(True)
+        self.cc_lbl.hide()
+        lay.addWidget(self.cc_lbl)
         lay.addWidget(hsplit, 1)
         lay.addWidget(self.info)
         lay.addWidget(self.status_lbl)
@@ -1268,6 +1281,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if snap:
             hz = round(hz / self.step_hz) * self.step_hz
         hz = int(round(min(max(hz, 24e6), 1766e6)))
+        if hasattr(self, "cc_lbl") and abs(hz - self.target_hz) > 1000:
+            self.cc_lbl.clear()                     # another channel: its own system info follows
+            self.cc_lbl.hide()
         self.target_hz = hz
         self.vfo.setValue(hz)
 
@@ -1318,6 +1334,8 @@ class MainWindow(QtWidgets.QMainWindow):
             btn.setChecked(True)
         if hasattr(self, "chan_region"):
             self._update_region()
+        if hasattr(self, "cc_lbl") and self.mode not in DIGITAL_MODES:
+            self.cc_lbl.hide()
         if hasattr(self, "p25_lbl"):
             self.p25_lbl.setVisible(self.mode in DIGITAL_MODES)
             if self.mode in DIGITAL_MODES and not self.p25_lbl.text():
@@ -1443,38 +1461,47 @@ class MainWindow(QtWidgets.QMainWindow):
             return f"{freq_hz / 1e6:.4f}"
         return ""
 
+    GRANT_STYLE = {"playing": ("#43a047", "▶ playing"), "clear": ("#43a047", "clear"),
+                   "encrypted": ("#e53935", "encrypted"), "checking": ("#9e9e9e", "checking…"),
+                   "phase 2": ("#9e9e9e", "Phase 2, not yet"), "out of span": ("#9e9e9e", "outside the span"),
+                   "busy": ("#9e9e9e", "not followed (max 3)"), "no plan": ("#9e9e9e", "waiting for the band plan")}
+
+    def _show_cc(self, ev):
+        """Control channel line: system, site and the grants being followed."""
+        if ev.get("proto") == "DMR":
+            head = (f"<span style='color:#8e7cc3'>■</span>  DMR control channel  ·  colour code "
+                    f"{ev['cc']}  ·  {ev['csbk_per_s']:.0f} CSBK/s <span style='color:gray'>"
+                    "(DMR trunk following not built yet)</span>")
+            self.cc_lbl.setText(head)
+            self.cc_lbl.show()
+            return
+        sysname = ""
+        if ev.get("sysid") is not None:
+            sysname = (f"system <b>{ev['wacn']:05X}-{ev['sysid']:03X}</b>" if ev.get("wacn") is not None
+                       else f"system <b>{ev['sysid']:03X}</b>")
+            if ev.get("site") is not None:
+                sysname += f"  ·  RFSS {ev.get('rfss')} site {ev['site']}"
+            sysname += "  ·  "
+        grants = []
+        for g in sorted(ev.get("active") or [], key=lambda g: g.get("state") != "playing")[:6]:
+            f = f"{g['freq'] / 1e6:.4f}" if g.get("freq") else f"ch {g['channel']}"
+            col, word = self.GRANT_STYLE.get(g.get("state"), ("#9e9e9e", g.get("state") or ""))
+            tg = f"TG <b>{g['tgid']}</b> → {f} <span style='color:{col}'>{word}</span>"
+            if g.get("emergency"):
+                tg += " <span style='color:#e53935'><b>EMERGENCY</b></span>"
+            grants.append(tg)
+        now = ("<br>" + "  ·  ".join(grants)) if grants else \
+            "  ·  <span style='color:gray'>no calls right now</span>"
+        self.cc_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  P25 control channel  ·  {sysname}"
+                            f"NAC 0x{ev['nac']:03X}{now}")
+        self.cc_lbl.show()
+        if self.p25_lbl.text().startswith("<span style='color:gray'>P25: waiting"):
+            self.p25_lbl.setText("<span style='color:gray'>following grants inside the span; "
+                                 "clear calls play here</span>")
+
     def on_p25_event(self, ev: dict):
         if ev["type"] == "cc":
-            if self.p25_lbl.text().startswith("<span style='color:#43a047'>●"):
-                return                                    # a call is showing; leave it
-            if ev.get("proto") == "DMR":
-                self.p25_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  DMR control channel  ·  "
-                                     f"colour code {ev['cc']}  ·  {ev['csbk_per_s']:.0f} CSBK/s "
-                                     "<span style='color:gray'>(trunked: voice is on other "
-                                     "channels; following them comes later)</span>")
-                return
-            sysname = ""
-            if ev.get("sysid") is not None:
-                sysname = (f"system <b>{ev['wacn']:05X}-{ev['sysid']:03X}</b>" if ev.get("wacn") is not None
-                           else f"system <b>{ev['sysid']:03X}</b>")
-                if ev.get("site") is not None:
-                    sysname += f"  ·  RFSS {ev.get('rfss')} site {ev['site']}"
-                sysname += "  ·  "
-            grants = []
-            for g in (ev.get("active") or [])[:4]:
-                f = f"{g['freq'] / 1e6:.4f}" if g.get("freq") else f"ch {g['channel']}"
-                tg = f"TG <b>{g['tgid']}</b> → {f}"
-                if g.get("slot") is not None:
-                    tg += f" slot {g['slot'] + 1}"
-                if g.get("emergency"):
-                    tg += " <span style='color:#e53935'>EMERG</span>"
-                if g.get("encrypted"):
-                    tg += " <span style='color:#e53935'>enc</span>"
-                grants.append(tg)
-            now = ("  ·  now: " + ", ".join(grants)) if grants else \
-                "  ·  <span style='color:gray'>no calls right now</span>"
-            self.p25_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  P25 control channel  ·  {sysname}"
-                                 f"NAC 0x{ev['nac']:03X}{now}")
+            self._show_cc(ev)
             return
         if self.presets_win is not None:
             self.presets_win.set_live(None if ev["type"] == "end" else self.target_hz)
@@ -1498,6 +1525,8 @@ class MainWindow(QtWidgets.QMainWindow):
             parts.append(f"radio <b>{src}</b>")
         if proto == "P25":
             parts.append(f"NAC 0x{ev['nac']:03X}")
+            if ev.get("freq"):
+                parts.append(f"on {ev['freq'] / 1e6:.4f}")
         elif proto == "DMR":
             parts.append(f"slot {ev.get('slot')}" + (f"  ·  CC {ev['cc']}" if ev.get("cc") is not None else ""))
         if ev.get("emergency"):
