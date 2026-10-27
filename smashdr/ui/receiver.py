@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.7.1"
+VERSION = "0.7.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -498,6 +498,7 @@ class BandStrip(pg.PlotWidget):
         self.hideAxis("left")
         self.hideAxis("bottom")
         self.setYRange(0, 1, padding=0)
+        self.plotItem.vb.disableAutoRange()          # x-linked: band segments must not move the view
         self._items = []
         self._span = None
 
@@ -538,6 +539,9 @@ class TagStrip(pg.PlotWidget):
         self.hideAxis("bottom")
         self.setYRange(0, self.ROWS, padding=0)
         self.setMouseEnabled(x=False, y=False)
+        # never auto-range: this strip is x-linked to the waterfall, and fitting the
+        # tags would drag the spectrum/waterfall view (and every click) off the real span
+        self.plotItem.vb.disableAutoRange()
         self._tooltip_fn, self._on_click = tooltip_fn, on_click
         self._items, self._hits = [], []        # hits: (freq MHz, half label width px, row, presets)
         self._presets, self._span = [], None
