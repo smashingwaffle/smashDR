@@ -1,1004 +1,1920 @@
 {
- "presets": [
-  {
-   "name": "W6MEP",
-   "freq_hz": 147240000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone + 67.0, open (RepeaterBook)"
-  },
-  {
-   "name": "K6VGP",
-   "freq_hz": 147360000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone + 103.5, private (RepeaterBook)"
-  },
-  {
-   "name": "WD8CIK",
-   "freq_hz": 445140000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone - 127.3, private, AllStar/EchoLink (RepeaterBook)"
-  },
-  {
-   "name": "WD6ABC",
-   "freq_hz": 445540000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone - 123.0, open, also Fusion (RepeaterBook)"
-  },
-  {
-   "name": "WA6LWW",
-   "freq_hz": 446780000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
-  },
-  {
-   "name": "446.94 link",
-   "freq_hz": 446940000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone -, private, EchoLink/IRLP (RepeaterBook)"
-  },
-  {
-   "name": "KB6COP",
-   "freq_hz": 447240000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone - 100.0, closed (RepeaterBook)"
-  },
-  {
-   "name": "K6JTH",
-   "freq_hz": 448100000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
-  },
-  {
-   "name": "W6ATN",
-   "freq_hz": 448420000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
-  },
-  {
-   "name": "W6JYP",
-   "freq_hz": 448880000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
-  },
-  {
-   "name": "W6THC",
-   "freq_hz": 448960000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
-  },
-  {
-   "name": "N6YN",
-   "freq_hz": 449480000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
-  },
-  {
-   "name": "NO6BS",
-   "freq_hz": 449700000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone - 131.8, open (RepeaterBook)"
-  },
-  {
-   "name": "WA6TTL",
-   "freq_hz": 449720000,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 5000,
-   "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
-  },
-  {
-   "name": "N6EX",
-   "freq_hz": 927987500,
-   "mode": "NFM",
-   "group": "Mt Wilson",
-   "step_hz": 12500,
-   "note": "Mt Wilson repeater, offset/tone -, open, AllStar (RepeaterBook)"
-  },
-  {
-   "name": "LAFD 7 Fire",
-   "freq_hz": 859437500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Dispatch - Fire, south of Mulholland (your area) \u00b7 192.8 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 4 EMS",
-   "freq_hz": 857937500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Dispatch - EMS, south of Mulholland (your area) \u00b7 94.8 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 2 Ops CB",
-   "freq_hz": 859937500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Operations Central Bureau \u00b7 88.5 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 10 Cmd",
-   "freq_hz": 856237500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Command \u00b7 123.0 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 11 Cmd",
-   "freq_hz": 860762500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Command \u00b7 127.3 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 9 Alt",
-   "freq_hz": 857237500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Alternate control - structure fire incidents \u00b7 107.2 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 5 Alt",
-   "freq_hz": 856937500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Alternate control - wildland / river rescue \u00b7 97.4 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 6 Alert",
-   "freq_hz": 858237500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "ALERT 6 / emergency trigger \u00b7 131.8 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 1 Ops South",
-   "freq_hz": 860937500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Operations South Bureau \u00b7 85.4 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 13 Ops West",
-   "freq_hz": 857437500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Operations West Bureau \u00b7 141.3 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 3 Ops Valley",
-   "freq_hz": 858937500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Operations Valley Bureau \u00b7 91.5 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 8 Valley",
-   "freq_hz": 858437500,
-   "mode": "NFM",
-   "group": "LAFD",
-   "step_hz": 12500,
-   "note": "Dispatch - Fire/EMS north of Mulholland \u00b7 103.5 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "HOLLENBECK 4",
-   "freq_hz": 507187500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Hollenbeck (Area 4) dispatch, your division \u00b7 NAC 466 \u00b7 SoCal Scanner (socalscanner.com); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "HOLLENBECK SX",
-   "freq_hz": 484625000,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Hollenbeck simplex (Ch 104) \u00b7 NAC 466 \u00b7 SoCal Scanner (socalscanner.com); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "NORTHEAST 11",
-   "freq_hz": 484837500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Northeast (Area 11) dispatch \u00b7 NAC 466 \u00b7 SoCal Scanner (socalscanner.com); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "CENTRAL 1",
-   "freq_hz": 506737500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Central (Area 1) dispatch \u00b7 NAC 466 \u00b7 SoCal Scanner (socalscanner.com); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "NEWTON 13",
-   "freq_hz": 484862500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Newton (Area 13) dispatch \u00b7 NAC 466 \u00b7 SoCal Scanner (socalscanner.com); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "RAMPART 2",
-   "freq_hz": 506937500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Rampart (Area 2) dispatch \u00b7 NAC 466 \u00b7 SoCal Scanner (socalscanner.com); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "CB TRAFFIC 24",
-   "freq_hz": 484812500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Central Traffic dispatch \u00b7 NAC 466 \u00b7 SoCal Scanner (socalscanner.com); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "HOTSHOT 26",
-   "freq_hz": 484712500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Citywide hotshot / Air / K9 \u00b7 NAC 466 \u00b7 SoCal Scanner (socalscanner.com); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "OCB TAC1",
-   "freq_hz": 507112500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Central Bureau Tac 1 \u00b7 NAC 466 \u00b7 RadioReference",
-   "digital": "P25"
-  },
-  {
-   "name": "OCB TAC2",
-   "freq_hz": 484787500,
-   "mode": "NFM",
-   "group": "LAPD (P25)",
-   "step_hz": 12500,
-   "note": "Central Bureau Tac 2 \u00b7 NAC 466 \u00b7 RadioReference",
-   "digital": "P25"
-  },
-  {
-   "name": "LARICS SGV UHF",
-   "freq_hz": 483850000,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 12500,
-   "note": "San Gabriel Simulcast UHF control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
-   "digital": "P25 Phase II CC"
-  },
-  {
-   "name": "LARICS SGV UHF 2",
-   "freq_hz": 483875000,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 12500,
-   "note": "San Gabriel Simulcast UHF control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
-   "digital": "P25 Phase II CC"
-  },
-  {
-   "name": "LARICS DT UHF",
-   "freq_hz": 476962500,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 12500,
-   "note": "Downtown Simulcast UHF control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
-   "digital": "P25 Phase II CC"
-  },
-  {
-   "name": "LARICS DT UHF 2",
-   "freq_hz": 476987500,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 12500,
-   "note": "Downtown Simulcast UHF control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
-   "digital": "P25 Phase II CC"
-  },
-  {
-   "name": "LARICS SGV 700",
-   "freq_hz": 774181250,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 6250,
-   "note": "San Gabriel Simulcast 700 control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
-   "digital": "P25 Phase II CC"
-  },
-  {
-   "name": "LARICS DT 700",
-   "freq_hz": 774268750,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 6250,
-   "note": "Downtown Simulcast 700 control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
-   "digital": "P25 Phase II CC"
-  },
-  {
-   "name": "CWIRS East",
-   "freq_hz": 851962500,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 12500,
-   "note": "East Simulcast control channel. CWIRS P25 Phase I (sysid 105), LA County departments, almost all clear. RadioReference",
-   "digital": "P25 CC"
-  },
-  {
-   "name": "CWIRS East 2",
-   "freq_hz": 852437500,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 12500,
-   "note": "East Simulcast control channel. CWIRS P25 Phase I (sysid 105), LA County departments, almost all clear. RadioReference",
-   "digital": "P25 CC"
-  },
-  {
-   "name": "CWIRS Basin",
-   "freq_hz": 851087500,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 12500,
-   "note": "Basin Simulcast control channel. CWIRS P25 Phase I (sysid 105), LA County departments, almost all clear. RadioReference",
-   "digital": "P25 CC"
-  },
-  {
-   "name": "CWIRS Basin 2",
-   "freq_hz": 851437500,
-   "mode": "NFM",
-   "group": "P25 trunked",
-   "step_hz": 12500,
-   "note": "Basin Simulcast control channel. CWIRS P25 Phase I (sysid 105), LA County departments, almost all clear. RadioReference",
-   "digital": "P25 CC"
-  },
-  {
-   "name": "LAC U-1",
-   "freq_hz": 483750000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Countywide Dispatch \u00b7 186.2 PL \u00b7 Fire Dispatch (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC U-2",
-   "freq_hz": 483550000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Countywide Admin / Alternate \u00b7 186.2 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC D-3",
-   "freq_hz": 484112500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Dispatch - San Gabriel Valley (BN 2,4,10,12,15,16) \u00b7 151.4 PL \u00b7 Fire Dispatch (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-30",
-   "freq_hz": 483025000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - San Gabriel Valley \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC D-1",
-   "freq_hz": 483325000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Dispatch - Santa Clarita / Antelope Valley (BN 6,11,17,22) \u00b7 151.4 PL \u00b7 Fire Dispatch (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC D-2",
-   "freq_hz": 482662500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Dispatch - Southern LA Basin (BN 7,8,9,14,18,21) \u00b7 151.4 PL \u00b7 Fire Dispatch (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC D-4",
-   "freq_hz": 482975000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Dispatch - Western LA Basin / Santa Monica Mountains (BN 1,3,5,13,20,23) \u00b7 151.4 PL \u00b7 Fire Dispatch (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC D-5",
-   "freq_hz": 482787500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Dispatch - Catalina and Coastal \u00b7 151.4 PL \u00b7 Fire Dispatch (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-10",
-   "freq_hz": 483525000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Santa Clarita and Antelope Valley \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-11",
-   "freq_hz": 483862500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Santa Clarita and Antelope Valley \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-12",
-   "freq_hz": 484012500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Santa Clarita and Antelope Valley \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-13",
-   "freq_hz": 483075000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Antelope Valley only \u00b7 186.2 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-20",
-   "freq_hz": 482887500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Southern LA Basin \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-21",
-   "freq_hz": 483050000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Southern LA Basin \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-22",
-   "freq_hz": 483237500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Southern LA Basin \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-23",
-   "freq_hz": 483387500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Southern LA Basin \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-24",
-   "freq_hz": 483537500,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Southern LA Basin \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAC C-25",
-   "freq_hz": 453675000,
-   "mode": "NFM",
-   "group": "LA Co Fire",
-   "step_hz": 12500,
-   "note": "LA County Fire, Command - Southern LA Basin \u00b7 151.4 PL \u00b7 Fire-Tac (RadioReference, 2024 plan)"
-  },
-  {
-   "name": "LAFD 12",
-   "freq_hz": 860437500,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 12500,
-   "note": "Tactical \u00b7 186.2 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 14",
-   "freq_hz": 856437500,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 12500,
-   "note": "Tactical \u00b7 146.2 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 15",
-   "freq_hz": 859762500,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 12500,
-   "note": "Tactical \u00b7 151.4 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 16",
-   "freq_hz": 858762500,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 12500,
-   "note": "Tactical \u00b7 162.2 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 17",
-   "freq_hz": 857762500,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 12500,
-   "note": "Tactical \u00b7 167.9 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 18",
-   "freq_hz": 856762500,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 12500,
-   "note": "Tactical \u00b7 173.8 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 19",
-   "freq_hz": 855012500,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 12500,
-   "note": "Tactical \u00b7 205 DPL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD 20",
-   "freq_hz": 855762500,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 12500,
-   "note": "Tactical \u00b7 205 DPL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD A/G",
-   "freq_hz": 154830000,
-   "mode": "NFM",
-   "group": "LAFD Tac",
-   "step_hz": 5000,
-   "note": "Air to ground \u00b7 100.0 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD A/A 1",
-   "freq_hz": 119975000,
-   "mode": "AM",
-   "group": "LAFD Tac",
-   "step_hz": 25000,
-   "note": "Helicopters air-air \u00b7 RadioReference"
-  },
-  {
-   "name": "LAFD A/A 2",
-   "freq_hz": 136025000,
-   "mode": "AM",
-   "group": "LAFD Tac",
-   "step_hz": 25000,
-   "note": "Helicopters air-air \u00b7 RadioReference"
-  },
-  {
-   "name": "CW TAC1",
-   "freq_hz": 507087500,
-   "mode": "NFM",
-   "group": "LAPD Tac (P25)",
-   "step_hz": 12500,
-   "note": "Citywide Tac \u00b7 NAC 466 \u00b7 RadioReference",
-   "digital": "P25"
-  },
-  {
-   "name": "CW TAC2",
-   "freq_hz": 484662500,
-   "mode": "NFM",
-   "group": "LAPD Tac (P25)",
-   "step_hz": 12500,
-   "note": "Citywide Tac \u00b7 NAC 466 \u00b7 RadioReference",
-   "digital": "P25"
-  },
-  {
-   "name": "CW TAC3",
-   "freq_hz": 484762500,
-   "mode": "NFM",
-   "group": "LAPD Tac (P25)",
-   "step_hz": 12500,
-   "note": "Citywide Tac \u00b7 NAC 466 \u00b7 RadioReference",
-   "digital": "P25"
-  },
-  {
-   "name": "CW TAC4",
-   "freq_hz": 484462500,
-   "mode": "NFM",
-   "group": "LAPD Tac (P25)",
-   "step_hz": 12500,
-   "note": "Citywide Tac \u00b7 NAC 466 \u00b7 RadioReference",
-   "digital": "P25"
-  },
-  {
-   "name": "CW TAC5",
-   "freq_hz": 484637500,
-   "mode": "NFM",
-   "group": "LAPD Tac (P25)",
-   "step_hz": 12500,
-   "note": "Citywide Tac \u00b7 NAC 466 \u00b7 RadioReference",
-   "digital": "P25"
-  },
-  {
-   "name": "CW TAC7",
-   "freq_hz": 484987500,
-   "mode": "NFM",
-   "group": "LAPD Tac (P25)",
-   "step_hz": 12500,
-   "note": "Citywide Tac \u00b7 NAC 466 \u00b7 RadioReference",
-   "digital": "P25"
-  },
-  {
-   "name": "LAPD ACC",
-   "freq_hz": 484437500,
-   "mode": "NFM",
-   "group": "LAPD Tac (P25)",
-   "step_hz": 12500,
-   "note": "Outside agency access to LAPD (analog) \u00b7 110.9 PL \u00b7 RadioReference"
-  },
-  {
-   "name": "El Monte twr",
-   "freq_hz": 121200000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000,
-   "note": "San Gabriel Valley Airport tower, closest to 90032 (0800-2000)"
-  },
-  {
-   "name": "El Monte ATIS",
-   "freq_hz": 118750000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000
-  },
-  {
-   "name": "Burbank twr",
-   "freq_hz": 118700000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000
-  },
-  {
-   "name": "Burbank ATIS",
-   "freq_hz": 134500000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000
-  },
-  {
-   "name": "LAX twr north",
-   "freq_hz": 133900000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000
-  },
-  {
-   "name": "LAX twr south",
-   "freq_hz": 120950000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000
-  },
-  {
-   "name": "LAX ATIS arr",
-   "freq_hz": 133800000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000
-  },
-  {
-   "name": "SoCal approach",
-   "freq_hz": 124300000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000,
-   "note": "LAX arrivals"
-  },
-  {
-   "name": "Guard",
-   "freq_hz": 121500000,
-   "mode": "AM",
-   "group": "Air",
-   "step_hz": 25000,
-   "note": "Aviation emergency"
-  },
-  {
-   "name": "Air-1 123.025",
-   "freq_hz": 123025000,
-   "mode": "AM",
-   "group": "LAPD Air",
-   "step_hz": 25000,
-   "note": "Air-1 primary: helicopter calling / air-to-air, LA Basin \u00b7 your list (airnav / RadioReference); verify on RR"
-  },
-  {
-   "name": "Air-2 123.075",
-   "freq_hz": 123075000,
-   "mode": "AM",
-   "group": "LAPD Air",
-   "step_hz": 25000,
-   "note": "Air-2 secondary air-to-air / Hooper Heliport landing coordination \u00b7 your list (airnav / RadioReference); verify on RR"
-  },
-  {
-   "name": "Hooper ASC 1",
-   "freq_hz": 122750000,
-   "mode": "AM",
-   "group": "LAPD Air",
-   "step_hz": 25000,
-   "note": "Air Support Company 1, LAPD Hooper Heliport \u00b7 your list (airnav / RadioReference); verify on RR"
-  },
-  {
-   "name": "Hooper ASC 2",
-   "freq_hz": 122850000,
-   "mode": "AM",
-   "group": "LAPD Air",
-   "step_hz": 25000,
-   "note": "Air Support Company 2 \u00b7 your list (airnav / RadioReference); verify on RR"
-  },
-  {
-   "name": "LAPD AIR-10",
-   "freq_hz": 507162500,
-   "mode": "NFM",
-   "group": "LAPD Air",
-   "step_hz": 12500,
-   "note": "Tactical air support / overhead tracking \u00b7 NAC 466 \u00b7 your list (airnav / RadioReference); verify on RR",
-   "digital": "P25"
-  },
-  {
-   "name": "2m simplex",
-   "freq_hz": 146520000,
-   "mode": "NFM",
-   "group": "Ham",
-   "step_hz": 5000,
-   "note": "National 2 m calling"
-  },
-  {
-   "name": "70cm simplex",
-   "freq_hz": 446000000,
-   "mode": "NFM",
-   "group": "Ham",
-   "step_hz": 5000,
-   "note": "National 70 cm calling"
-  },
-  {
-   "name": "APRS",
-   "freq_hz": 144390000,
-   "mode": "NFM",
-   "group": "Ham",
-   "step_hz": 5000
-  },
-  {
-   "name": "ISS downlink",
-   "freq_hz": 145800000,
-   "mode": "NFM",
-   "group": "Ham",
-   "step_hz": 5000
-  },
-  {
-   "name": "AA6RJ Fusion",
-   "freq_hz": 449340000,
-   "mode": "NFM",
-   "group": "Ham digital",
-   "step_hz": 12500,
-   "digital": "Fusion",
-   "note": "Multi-mode repeater AA6RJ/R, Fusion DN heard (VE6DBD via WIRES-X) \u00b7 your recording 2026-10-24"
-  },
-  {
-   "name": "DMR 449.4625",
-   "freq_hz": 449462500,
-   "mode": "NFM",
-   "group": "Ham digital",
-   "step_hz": 12500,
-   "digital": "DMR",
-   "note": "DMR repeater, colour code 6 (decoded) \u00b7 your recording 2026-10-24"
-  },
-  {
-   "name": "DMR 446.820",
-   "freq_hz": 446820000,
-   "mode": "NFM",
-   "group": "Ham digital",
-   "step_hz": 12500,
-   "digital": "DMR",
-   "note": "DMR repeater, colour code 1, BrandMeister TG 91 heard \u00b7 your recording 2026-10-24"
-  },
-  {
-   "name": "NOAA LA",
-   "freq_hz": 162550000,
-   "mode": "NFM",
-   "group": "Weather",
-   "step_hz": 25000,
-   "note": "KWO37 Los Angeles"
-  },
-  {
-   "name": "NOAA Malibu",
-   "freq_hz": 162425000,
-   "mode": "NFM",
-   "group": "Weather",
-   "step_hz": 25000,
-   "note": "KWL22 Malibu marine"
-  },
-  {
-   "name": "Marine ch 16",
-   "freq_hz": 156800000,
-   "mode": "NFM",
-   "group": "Marine",
-   "step_hz": 25000,
-   "note": "Distress and calling"
-  },
-  {
-   "name": "KCRW",
-   "freq_hz": 89900000,
-   "mode": "WFM",
-   "group": "FM",
-   "step_hz": 200000
-  },
-  {
-   "name": "LAist 89.3",
-   "freq_hz": 89300000,
-   "mode": "WFM",
-   "group": "FM",
-   "step_hz": 200000
-  },
-  {
-   "name": "KROQ",
-   "freq_hz": 106700000,
-   "mode": "WFM",
-   "group": "FM",
-   "step_hz": 200000
-  },
-  {
-   "name": "CHP Black base",
-   "freq_hz": 42120000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Base (dispatch) \u00b7 Central LA, 15-prefix: downtown freeways \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Black mob",
-   "freq_hz": 42400000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Mobile (units) \u00b7 Central LA, 15-prefix: downtown freeways \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Teal base",
-   "freq_hz": 42360000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Base (dispatch) \u00b7 West Valley, 56-prefix: San Fernando Valley \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Teal mob",
-   "freq_hz": 42140000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Mobile (units) \u00b7 West Valley, 56-prefix: San Fernando Valley \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP White base",
-   "freq_hz": 42500000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Base (dispatch) \u00b7 South LA, 77-prefix: South LA basin + beach cities \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP White mob",
-   "freq_hz": 42260000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Mobile (units) \u00b7 South LA, 77-prefix: South LA basin + beach cities \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Pink base",
-   "freq_hz": 42420000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Base (dispatch) \u00b7 West LA, 79-prefix: Santa Monica, Culver City, Westside \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Pink mob",
-   "freq_hz": 42060000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Mobile (units) \u00b7 West LA, 79-prefix: Santa Monica, Culver City, Westside \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Tan base",
-   "freq_hz": 42460000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Base (dispatch) \u00b7 Newhall / Castaic, 78-prefix: Santa Clarita, north I-5 \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Tan mob",
-   "freq_hz": 42740000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Mobile (units) \u00b7 Newhall / Castaic, 78-prefix: Santa Clarita, north I-5 \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Gold base",
-   "freq_hz": 42340000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Base (dispatch) \u00b7 Antelope Valley, 89-prefix: Lancaster, Palmdale \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  },
-  {
-   "name": "CHP Gold mob",
-   "freq_hz": 42200000,
-   "mode": "NFM",
-   "group": "Highway Patrol",
-   "step_hz": 20000,
-   "note": "Mobile (units) \u00b7 Antelope Valley, 89-prefix: Lancaster, Palmdale \u00b7 CHP HPM 60.1 ch.7 (your list); verify on RR"
-  }
- ],
- "collapsed": [
-  "LA Co Fire",
-  "LAFD Tac",
-  "LAPD Tac (P25)"
- ]
+  "presets": [
+    {
+      "name": "W6MEP",
+      "freq_hz": 147240000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone + 67.0, open (RepeaterBook)"
+    },
+    {
+      "name": "K6VGP",
+      "freq_hz": 147360000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone + 103.5, private (RepeaterBook)"
+    },
+    {
+      "name": "WD8CIK",
+      "freq_hz": 445140000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone - 127.3, private, AllStar/EchoLink (RepeaterBook)"
+    },
+    {
+      "name": "WD6ABC",
+      "freq_hz": 445540000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone - 123.0, open, also Fusion (RepeaterBook)"
+    },
+    {
+      "name": "WA6LWW",
+      "freq_hz": 446780000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
+    },
+    {
+      "name": "446.94 link",
+      "freq_hz": 446940000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone -, private, EchoLink/IRLP (RepeaterBook)"
+    },
+    {
+      "name": "KB6COP",
+      "freq_hz": 447240000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone - 100.0, closed (RepeaterBook)"
+    },
+    {
+      "name": "K6JTH",
+      "freq_hz": 448100000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
+    },
+    {
+      "name": "W6ATN",
+      "freq_hz": 448420000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
+    },
+    {
+      "name": "W6JYP",
+      "freq_hz": 448880000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
+    },
+    {
+      "name": "W6THC",
+      "freq_hz": 448960000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
+    },
+    {
+      "name": "N6YN",
+      "freq_hz": 449480000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone -, closed (RepeaterBook)"
+    },
+    {
+      "name": "NO6BS",
+      "freq_hz": 449700000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone - 131.8, open (RepeaterBook)"
+    },
+    {
+      "name": "WA6TTL",
+      "freq_hz": 449720000,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 5000,
+      "note": "Mt Wilson repeater, offset/tone -, private (RepeaterBook)"
+    },
+    {
+      "name": "N6EX",
+      "freq_hz": 927987500,
+      "mode": "NFM",
+      "group": "Mt Wilson",
+      "step_hz": 12500,
+      "note": "Mt Wilson repeater, offset/tone -, open, AllStar (RepeaterBook)"
+    },
+    {
+      "name": "LAFD 7 Fire",
+      "freq_hz": 859437500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Dispatch - Fire, south of Mulholland (your area) · 192.8 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 4 EMS",
+      "freq_hz": 857937500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Dispatch - EMS, south of Mulholland (your area) · 94.8 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 2 Ops CB",
+      "freq_hz": 859937500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Operations Central Bureau · 88.5 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 10 Cmd",
+      "freq_hz": 856237500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Command · 123.0 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 11 Cmd",
+      "freq_hz": 860762500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Command · 127.3 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 9 Alt",
+      "freq_hz": 857237500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Alternate control - structure fire incidents · 107.2 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 5 Alt",
+      "freq_hz": 856937500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Alternate control - wildland / river rescue · 97.4 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 6 Alert",
+      "freq_hz": 858237500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "ALERT 6 / emergency trigger · 131.8 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 1 Ops South",
+      "freq_hz": 860937500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Operations South Bureau · 85.4 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 13 Ops West",
+      "freq_hz": 857437500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Operations West Bureau · 141.3 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 3 Ops Valley",
+      "freq_hz": 858937500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Operations Valley Bureau · 91.5 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 8 Valley",
+      "freq_hz": 858437500,
+      "mode": "NFM",
+      "group": "LAFD",
+      "step_hz": 12500,
+      "note": "Dispatch - Fire/EMS north of Mulholland · 103.5 PL · RadioReference"
+    },
+    {
+      "name": "HOLLENBECK 4",
+      "freq_hz": 507187500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Hollenbeck (Area 4) dispatch, your division · NAC 466 · SoCal Scanner (socalscanner.com); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "HOLLENBECK SX",
+      "freq_hz": 484625000,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Hollenbeck simplex (Ch 104) · NAC 466 · SoCal Scanner (socalscanner.com); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "NORTHEAST 11",
+      "freq_hz": 484837500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Northeast (Area 11) dispatch · NAC 466 · SoCal Scanner (socalscanner.com); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "CENTRAL 1",
+      "freq_hz": 506737500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Central (Area 1) dispatch · NAC 466 · SoCal Scanner (socalscanner.com); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "NEWTON 13",
+      "freq_hz": 484862500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Newton (Area 13) dispatch · NAC 466 · SoCal Scanner (socalscanner.com); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "RAMPART 2",
+      "freq_hz": 506937500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Rampart (Area 2) dispatch · NAC 466 · SoCal Scanner (socalscanner.com); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "CB TRAFFIC 24",
+      "freq_hz": 484812500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Central Traffic dispatch · NAC 466 · SoCal Scanner (socalscanner.com); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "HOTSHOT 26",
+      "freq_hz": 484712500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Citywide hotshot / Air / K9 · NAC 466 · SoCal Scanner (socalscanner.com); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "OCB TAC1",
+      "freq_hz": 507112500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Central Bureau Tac 1 · NAC 466 · RadioReference",
+      "digital": "P25"
+    },
+    {
+      "name": "OCB TAC2",
+      "freq_hz": 484787500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "Central Bureau Tac 2 · NAC 466 · RadioReference",
+      "digital": "P25"
+    },
+    {
+      "name": "LARICS SGV UHF",
+      "freq_hz": 483850000,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "note": "San Gabriel Simulcast UHF control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
+      "digital": "P25 Phase II CC"
+    },
+    {
+      "name": "LARICS SGV UHF 2",
+      "freq_hz": 483875000,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "note": "San Gabriel Simulcast UHF control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
+      "digital": "P25 Phase II CC"
+    },
+    {
+      "name": "LARICS DT UHF",
+      "freq_hz": 476962500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "note": "Downtown Simulcast UHF control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
+      "digital": "P25 Phase II CC"
+    },
+    {
+      "name": "LARICS DT UHF 2",
+      "freq_hz": 476987500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "note": "Downtown Simulcast UHF control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
+      "digital": "P25 Phase II CC"
+    },
+    {
+      "name": "LARICS SGV 700",
+      "freq_hz": 774181250,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 6250,
+      "note": "San Gabriel Simulcast 700 control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
+      "digital": "P25 Phase II CC"
+    },
+    {
+      "name": "LARICS DT 700",
+      "freq_hz": 774268750,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 6250,
+      "note": "Downtown Simulcast 700 control channel. LA-RICS P25 Phase II (sysid 69F). Clear: LASD dispatch, County Fire dispatch, EMS (DHS). Encrypted: LASD tac/investigative, Pasadena. RadioReference",
+      "digital": "P25 Phase II CC"
+    },
+    {
+      "name": "CWIRS East",
+      "freq_hz": 851962500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "note": "East Simulcast control channel. CWIRS P25 Phase I (sysid 105), LA County departments, almost all clear. RadioReference",
+      "digital": "P25 CC"
+    },
+    {
+      "name": "CWIRS East 2",
+      "freq_hz": 852437500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "note": "East Simulcast control channel. CWIRS P25 Phase I (sysid 105), LA County departments, almost all clear. RadioReference",
+      "digital": "P25 CC"
+    },
+    {
+      "name": "CWIRS Basin",
+      "freq_hz": 851087500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "note": "Basin Simulcast control channel. CWIRS P25 Phase I (sysid 105), LA County departments, almost all clear. RadioReference",
+      "digital": "P25 CC"
+    },
+    {
+      "name": "CWIRS Basin 2",
+      "freq_hz": 851437500,
+      "mode": "NFM",
+      "group": "P25 trunked",
+      "step_hz": 12500,
+      "note": "Basin Simulcast control channel. CWIRS P25 Phase I (sysid 105), LA County departments, almost all clear. RadioReference",
+      "digital": "P25 CC"
+    },
+    {
+      "name": "LAC U-1",
+      "freq_hz": 483750000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Countywide Dispatch · 186.2 PL · Fire Dispatch (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC U-2",
+      "freq_hz": 483550000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Countywide Admin / Alternate · 186.2 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC D-3",
+      "freq_hz": 484112500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Dispatch - San Gabriel Valley (BN 2,4,10,12,15,16) · 151.4 PL · Fire Dispatch (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-30",
+      "freq_hz": 483025000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - San Gabriel Valley · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC D-1",
+      "freq_hz": 483325000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Dispatch - Santa Clarita / Antelope Valley (BN 6,11,17,22) · 151.4 PL · Fire Dispatch (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC D-2",
+      "freq_hz": 482662500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Dispatch - Southern LA Basin (BN 7,8,9,14,18,21) · 151.4 PL · Fire Dispatch (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC D-4",
+      "freq_hz": 482975000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Dispatch - Western LA Basin / Santa Monica Mountains (BN 1,3,5,13,20,23) · 151.4 PL · Fire Dispatch (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC D-5",
+      "freq_hz": 482787500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Dispatch - Catalina and Coastal · 151.4 PL · Fire Dispatch (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-10",
+      "freq_hz": 483525000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Santa Clarita and Antelope Valley · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-11",
+      "freq_hz": 483862500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Santa Clarita and Antelope Valley · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-12",
+      "freq_hz": 484012500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Santa Clarita and Antelope Valley · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-13",
+      "freq_hz": 483075000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Antelope Valley only · 186.2 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-20",
+      "freq_hz": 482887500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Southern LA Basin · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-21",
+      "freq_hz": 483050000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Southern LA Basin · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-22",
+      "freq_hz": 483237500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Southern LA Basin · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-23",
+      "freq_hz": 483387500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Southern LA Basin · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-24",
+      "freq_hz": 483537500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Southern LA Basin · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAC C-25",
+      "freq_hz": 453675000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Command - Southern LA Basin · 151.4 PL · Fire-Tac (RadioReference, 2024 plan)"
+    },
+    {
+      "name": "LAFD 12",
+      "freq_hz": 860437500,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 12500,
+      "note": "Tactical · 186.2 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 14",
+      "freq_hz": 856437500,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 12500,
+      "note": "Tactical · 146.2 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 15",
+      "freq_hz": 859762500,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 12500,
+      "note": "Tactical · 151.4 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 16",
+      "freq_hz": 858762500,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 12500,
+      "note": "Tactical · 162.2 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 17",
+      "freq_hz": 857762500,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 12500,
+      "note": "Tactical · 167.9 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 18",
+      "freq_hz": 856762500,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 12500,
+      "note": "Tactical · 173.8 PL · RadioReference"
+    },
+    {
+      "name": "LAFD 19",
+      "freq_hz": 855012500,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 12500,
+      "note": "Tactical · 205 DPL · RadioReference"
+    },
+    {
+      "name": "LAFD 20",
+      "freq_hz": 855762500,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 12500,
+      "note": "Tactical · 205 DPL · RadioReference"
+    },
+    {
+      "name": "LAFD A/G",
+      "freq_hz": 154830000,
+      "mode": "NFM",
+      "group": "LAFD Tac",
+      "step_hz": 5000,
+      "note": "Air to ground · 100.0 PL · RadioReference"
+    },
+    {
+      "name": "LAFD A/A 1",
+      "freq_hz": 119975000,
+      "mode": "AM",
+      "group": "LAFD Tac",
+      "step_hz": 25000,
+      "note": "Helicopters air-air · RadioReference"
+    },
+    {
+      "name": "LAFD A/A 2",
+      "freq_hz": 136025000,
+      "mode": "AM",
+      "group": "LAFD Tac",
+      "step_hz": 25000,
+      "note": "Helicopters air-air · RadioReference"
+    },
+    {
+      "name": "CW TAC1",
+      "freq_hz": 507087500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "Citywide Tac · NAC 466 · RadioReference",
+      "digital": "P25"
+    },
+    {
+      "name": "CW TAC2",
+      "freq_hz": 484662500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "Citywide Tac · NAC 466 · RadioReference",
+      "digital": "P25"
+    },
+    {
+      "name": "CW TAC3",
+      "freq_hz": 484762500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "Citywide Tac · NAC 466 · RadioReference",
+      "digital": "P25"
+    },
+    {
+      "name": "CW TAC4",
+      "freq_hz": 484462500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "Citywide Tac · NAC 466 · RadioReference",
+      "digital": "P25"
+    },
+    {
+      "name": "CW TAC5",
+      "freq_hz": 484637500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "Citywide Tac · NAC 466 · RadioReference",
+      "digital": "P25"
+    },
+    {
+      "name": "CW TAC7",
+      "freq_hz": 484987500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "Citywide Tac · NAC 466 · RadioReference",
+      "digital": "P25"
+    },
+    {
+      "name": "LAPD ACC",
+      "freq_hz": 484437500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "Outside agency access to LAPD (analog) · 110.9 PL · RadioReference"
+    },
+    {
+      "name": "El Monte twr",
+      "freq_hz": 121200000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000,
+      "note": "San Gabriel Valley Airport tower, closest to 90032 (0800-2000)"
+    },
+    {
+      "name": "El Monte ATIS",
+      "freq_hz": 118750000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000
+    },
+    {
+      "name": "Burbank twr",
+      "freq_hz": 118700000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000
+    },
+    {
+      "name": "Burbank ATIS",
+      "freq_hz": 134500000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000
+    },
+    {
+      "name": "LAX twr north",
+      "freq_hz": 133900000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000
+    },
+    {
+      "name": "LAX twr south",
+      "freq_hz": 120950000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000
+    },
+    {
+      "name": "LAX ATIS arr",
+      "freq_hz": 133800000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000
+    },
+    {
+      "name": "SoCal approach",
+      "freq_hz": 124300000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000,
+      "note": "LAX arrivals"
+    },
+    {
+      "name": "Guard",
+      "freq_hz": 121500000,
+      "mode": "AM",
+      "group": "Air",
+      "step_hz": 25000,
+      "note": "Aviation emergency"
+    },
+    {
+      "name": "Air-1 123.025",
+      "freq_hz": 123025000,
+      "mode": "AM",
+      "group": "LAPD Air",
+      "step_hz": 25000,
+      "note": "Air-1 primary: helicopter calling / air-to-air, LA Basin · your list (airnav / RadioReference); verify on RR"
+    },
+    {
+      "name": "Air-2 123.075",
+      "freq_hz": 123075000,
+      "mode": "AM",
+      "group": "LAPD Air",
+      "step_hz": 25000,
+      "note": "Air-2 secondary air-to-air / Hooper Heliport landing coordination · your list (airnav / RadioReference); verify on RR"
+    },
+    {
+      "name": "Hooper ASC 1",
+      "freq_hz": 122750000,
+      "mode": "AM",
+      "group": "LAPD Air",
+      "step_hz": 25000,
+      "note": "Air Support Company 1, LAPD Hooper Heliport · your list (airnav / RadioReference); verify on RR"
+    },
+    {
+      "name": "Hooper ASC 2",
+      "freq_hz": 122850000,
+      "mode": "AM",
+      "group": "LAPD Air",
+      "step_hz": 25000,
+      "note": "Air Support Company 2 · your list (airnav / RadioReference); verify on RR"
+    },
+    {
+      "name": "LAPD AIR-10",
+      "freq_hz": 507162500,
+      "mode": "NFM",
+      "group": "LAPD Air",
+      "step_hz": 12500,
+      "note": "Tactical air support / overhead tracking · NAC 466 · your list (airnav / RadioReference); verify on RR",
+      "digital": "P25"
+    },
+    {
+      "name": "2m simplex",
+      "freq_hz": 146520000,
+      "mode": "NFM",
+      "group": "Ham",
+      "step_hz": 5000,
+      "note": "National 2 m calling"
+    },
+    {
+      "name": "70cm simplex",
+      "freq_hz": 446000000,
+      "mode": "NFM",
+      "group": "Ham",
+      "step_hz": 5000,
+      "note": "National 70 cm calling"
+    },
+    {
+      "name": "APRS",
+      "freq_hz": 144390000,
+      "mode": "NFM",
+      "group": "Ham",
+      "step_hz": 5000
+    },
+    {
+      "name": "ISS downlink",
+      "freq_hz": 145800000,
+      "mode": "NFM",
+      "group": "Ham",
+      "step_hz": 5000
+    },
+    {
+      "name": "AA6RJ Fusion",
+      "freq_hz": 449340000,
+      "mode": "NFM",
+      "group": "Ham digital",
+      "step_hz": 12500,
+      "digital": "Fusion",
+      "note": "Multi-mode repeater AA6RJ/R, Fusion DN heard (VE6DBD via WIRES-X) · your recording 2026-10-24"
+    },
+    {
+      "name": "DMR 449.4625",
+      "freq_hz": 449462500,
+      "mode": "NFM",
+      "group": "Ham digital",
+      "step_hz": 12500,
+      "digital": "DMR",
+      "note": "DMR repeater, colour code 6 (decoded) · your recording 2026-10-24"
+    },
+    {
+      "name": "DMR 446.820",
+      "freq_hz": 446820000,
+      "mode": "NFM",
+      "group": "Ham digital",
+      "step_hz": 12500,
+      "digital": "DMR",
+      "note": "DMR repeater, colour code 1, BrandMeister TG 91 heard · your recording 2026-10-24"
+    },
+    {
+      "name": "NOAA LA",
+      "freq_hz": 162550000,
+      "mode": "NFM",
+      "group": "Weather",
+      "step_hz": 25000,
+      "note": "KWO37 Los Angeles"
+    },
+    {
+      "name": "NOAA Malibu",
+      "freq_hz": 162425000,
+      "mode": "NFM",
+      "group": "Weather",
+      "step_hz": 25000,
+      "note": "KWL22 Malibu marine"
+    },
+    {
+      "name": "Marine ch 16",
+      "freq_hz": 156800000,
+      "mode": "NFM",
+      "group": "Marine",
+      "step_hz": 25000,
+      "note": "Distress and calling"
+    },
+    {
+      "name": "KCRW",
+      "freq_hz": 89900000,
+      "mode": "WFM",
+      "group": "FM",
+      "step_hz": 200000
+    },
+    {
+      "name": "LAist 89.3",
+      "freq_hz": 89300000,
+      "mode": "WFM",
+      "group": "FM",
+      "step_hz": 200000
+    },
+    {
+      "name": "KROQ",
+      "freq_hz": 106700000,
+      "mode": "WFM",
+      "group": "FM",
+      "step_hz": 200000
+    },
+    {
+      "name": "CHP Black base",
+      "freq_hz": 42120000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Base (dispatch) · Central LA, 15-prefix: downtown freeways · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Black mob",
+      "freq_hz": 42400000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Mobile (units) · Central LA, 15-prefix: downtown freeways · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Teal base",
+      "freq_hz": 42360000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Base (dispatch) · West Valley, 56-prefix: San Fernando Valley · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Teal mob",
+      "freq_hz": 42140000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Mobile (units) · West Valley, 56-prefix: San Fernando Valley · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP White base",
+      "freq_hz": 42500000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Base (dispatch) · South LA, 77-prefix: South LA basin + beach cities · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP White mob",
+      "freq_hz": 42260000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Mobile (units) · South LA, 77-prefix: South LA basin + beach cities · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Pink base",
+      "freq_hz": 42420000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Base (dispatch) · West LA, 79-prefix: Santa Monica, Culver City, Westside · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Pink mob",
+      "freq_hz": 42060000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Mobile (units) · West LA, 79-prefix: Santa Monica, Culver City, Westside · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Tan base",
+      "freq_hz": 42460000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Base (dispatch) · Newhall / Castaic, 78-prefix: Santa Clarita, north I-5 · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Tan mob",
+      "freq_hz": 42740000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Mobile (units) · Newhall / Castaic, 78-prefix: Santa Clarita, north I-5 · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Gold base",
+      "freq_hz": 42340000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Base (dispatch) · Antelope Valley, 89-prefix: Lancaster, Palmdale · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "CHP Gold mob",
+      "freq_hz": 42200000,
+      "mode": "NFM",
+      "group": "Highway Patrol",
+      "step_hz": 20000,
+      "note": "Mobile (units) · Antelope Valley, 89-prefix: Lancaster, Palmdale · CHP HPM 60.1 ch.7 (your list); verify on RR"
+    },
+    {
+      "name": "LIFEGUARD 1",
+      "freq_hz": 37060000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "Lifeguard Boats South · 88.5 PL · interceptradio.com"
+    },
+    {
+      "name": "LIFEGUARD 3",
+      "freq_hz": 37080000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "Lifeguard Boats North · 88.5 PL · interceptradio.com"
+    },
+    {
+      "name": "LIFEGUARD 4",
+      "freq_hz": 37200000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "Lifeguard Boats Central & Avalon · 88.5 PL · interceptradio.com"
+    },
+    {
+      "name": "LIFEGUARD ALL",
+      "freq_hz": 37360000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "Lifeguard Boats All 3 beach sections and Catalina Island · 88.5 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-1",
+      "freq_hz": 152150000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command 1 · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-2",
+      "freq_hz": 152240000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Command 2 · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-3",
+      "freq_hz": 152540000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Command 3 · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-4",
+      "freq_hz": 152570000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Command 4 · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-5",
+      "freq_hz": 152780000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Command 5 · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-6",
+      "freq_hz": 153830000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-7",
+      "freq_hz": 153890000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-8",
+      "freq_hz": 154070000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-9",
+      "freq_hz": 154340000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LAC AIR-GND",
+      "freq_hz": 154400000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire helicopter air-ground · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-10",
+      "freq_hz": 154415000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-11",
+      "freq_hz": 154430000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LAC F-20",
+      "freq_hz": 156105000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-12",
+      "freq_hz": 158970000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-13",
+      "freq_hz": 159090000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-21",
+      "freq_hz": 159225000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-15",
+      "freq_hz": 159525000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac Coastal Battalions · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-14",
+      "freq_hz": 159630000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac Coastal Battalions · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-16",
+      "freq_hz": 161370000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Tac Coastal Battalions · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-17",
+      "freq_hz": 161475000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac Coastal Battalions & Catalina · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-18",
+      "freq_hz": 161505000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Command Coastal Battalions & Catalina · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-19",
+      "freq_hz": 161520000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 6250,
+      "note": "LA County Fire, Fire Command Coastal Battalions · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "FIRE A/A",
+      "freq_hz": 169287500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "Fixed wing air-air (09 fires) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "FIRE CMD 09",
+      "freq_hz": 170012500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "Command (09 fires) · interceptradio.com"
+    },
+    {
+      "name": "LAC CREWS",
+      "freq_hz": 453725000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Crews & Dozer · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-66",
+      "freq_hz": 453775000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAUSD PD",
+      "freq_hz": 453800000,
+      "mode": "NFM",
+      "group": "Local agencies",
+      "step_hz": 12500,
+      "note": "police LAUSD · 131.8 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-67",
+      "freq_hz": 453825000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-69",
+      "freq_hz": 453900000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac Antelope Valley Only · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-68",
+      "freq_hz": 453975000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "REDONDO PD",
+      "freq_hz": 460075000,
+      "mode": "NFM",
+      "group": "Local agencies",
+      "step_hz": 12500,
+      "note": "Redondo Beach Police Disp. F-1 · 71.9 PL · interceptradio.com"
+    },
+    {
+      "name": "BEV HILLS FD",
+      "freq_hz": 460575000,
+      "mode": "NFM",
+      "group": "Local agencies",
+      "step_hz": 12500,
+      "note": "Fire Tac - Beverly Hills ? · 173.8 PL · interceptradio.com"
+    },
+    {
+      "name": "DRUG TF 1",
+      "freq_hz": 464500000,
+      "mode": "NFM",
+      "group": "Local agencies",
+      "step_hz": 12500,
+      "note": "LA & OC county drug task force · 136.5 PL · interceptradio.com"
+    },
+    {
+      "name": "DRUG TF 2",
+      "freq_hz": 464550000,
+      "mode": "NFM",
+      "group": "Local agencies",
+      "step_hz": 12500,
+      "note": "LA & OC county drug task force · 136.5 PL · interceptradio.com"
+    },
+    {
+      "name": "LAPD SWAT 1",
+      "freq_hz": 467950000,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "LAPD SWAT Tac · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LAPD SWAT 2",
+      "freq_hz": 467975000,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "LAPD SWAT Tac · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD LTAC13",
+      "freq_hz": 476062500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "L-Tac 13 - Compton / Carson · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LAC F-60",
+      "freq_hz": 478275000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-62",
+      "freq_hz": 478300000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-64",
+      "freq_hz": 478325000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-61",
+      "freq_hz": 481275000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-63",
+      "freq_hz": 481300000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC F-65",
+      "freq_hz": 481325000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Tac · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD CTAC1",
+      "freq_hz": 482812500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "C-Tac 1 - Countywide Tac · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD CTAC2",
+      "freq_hz": 482837500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "C-Tac 2 - Countywide Tac · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD D-5",
+      "freq_hz": 482862500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 5 - Santa Clarita Valley · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD D-10",
+      "freq_hz": 482912500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 10 - Malibu / Lost Hills · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD D-6",
+      "freq_hz": 482937500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 6 - San Dimas / Walnut / Diamond Bar · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD D-11",
+      "freq_hz": 482987500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 11 - Temple · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LAC C-44",
+      "freq_hz": 483012500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command Western LA Basin & Santa Monica Mountains · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD D-15",
+      "freq_hz": 483037500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 15 - Lancaster / Palmdale · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD LTACTC",
+      "freq_hz": 483062500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "L-Tac TC - Transit Bureau / College Safety Bureau (old LTAC 13/CTAC3) · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD ATAC1",
+      "freq_hz": 483087500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "A-Tac 1 - North Area Tac · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD LTAC8",
+      "freq_hz": 483112500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "L-Tac 8 - Altadena / La Crescenta Valley + Santa Clarita Valley · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD D-14",
+      "freq_hz": 483137500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 14 - Cerritos / Lakewood · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LAC C-50",
+      "freq_hz": 483162500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command Catalina & Coastal · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC C-31",
+      "freq_hz": 483175000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command San Gabriel Valley · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD LTAC11",
+      "freq_hz": 483187500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "L-Tac 11 - Lancaster / Palmdale · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD D-3",
+      "freq_hz": 483212500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 3 - East LA · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD D-4",
+      "freq_hz": 483262500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 4 - Century / Lynwood · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD EMERG",
+      "freq_hz": 483287500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Emergency trigger · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD D-16",
+      "freq_hz": 483312500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 16 - Transit Bureau / College Safety Bureau · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LAC C-32",
+      "freq_hz": 483337500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command San Gabriel Valley · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD D-2",
+      "freq_hz": 483362500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 2 - West Hollywood / Universal Citywalk · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD LTAC12",
+      "freq_hz": 483412500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "L-Tac 12 - Temple · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD D-12",
+      "freq_hz": 483437500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 12 - Marina Del Rey / Lawndale / Lennox · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD LTAC5",
+      "freq_hz": 483462500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "L-Tac 5 - Compton / Carson · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LAC C-41",
+      "freq_hz": 483475000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command Western LA Basin & Santa Monica Mountains · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD LTAC6",
+      "freq_hz": 483487500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "L-Tac 6 - East LA · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LAC C-33",
+      "freq_hz": 483500000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command San Gabriel Valley · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD MA ACC",
+      "freq_hz": 483562500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Mutual Aid - LASD sheriff access · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LAC C-51",
+      "freq_hz": 483600000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command Catalina & Coastal · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC C-42",
+      "freq_hz": 483625000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command Western LA Basin & Santa Monica Mountains · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD AIR",
+      "freq_hz": 483637500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Aircraft Dispatch · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LAC C-34",
+      "freq_hz": 483675000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command San Gabriel Valley · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD D-8",
+      "freq_hz": 483687500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 8 - Industry · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD LTAC LK",
+      "freq_hz": 483737500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "LTac Lake - Lake LA / Antelope Valley · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD D-13",
+      "freq_hz": 483762500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 13 - Whittier / Norwalk / Pico Rivera / La Mirada · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LAC C-52",
+      "freq_hz": 483775000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command Catalina & Coastal · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD MA-3",
+      "freq_hz": 483787500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "MA-3 - Mutual Aid East *186.2 tone · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LAC C-36",
+      "freq_hz": 483812500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command San Gabriel Valley · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC C-35",
+      "freq_hz": 483887500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command San Gabriel Valley · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LAC C-43",
+      "freq_hz": 483912500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command Western LA Basin & Santa Monica Mountains · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LIFEGUARD ACC",
+      "freq_hz": 483962500,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "Lifeguard Access · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD D-1",
+      "freq_hz": 483987500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 1 - Altadena / La Crescenta Valley · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD D-7",
+      "freq_hz": 484037500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 7 - Avalon / Lomita · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LAC C-37",
+      "freq_hz": 484125000,
+      "mode": "NFM",
+      "group": "LA Co Fire",
+      "step_hz": 12500,
+      "note": "LA County Fire, Fire Command San Gabriel Valley · 151.4 PL · interceptradio.com"
+    },
+    {
+      "name": "LASD MA-4",
+      "freq_hz": 484137500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "MA-4 - Mutual Aid San Gabriel Valley *186.2 tone · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "LASD D-9",
+      "freq_hz": 484162500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Dispatch 9 - Carson / Compton / Metrolink · may be retired (LASD moved to LA-RICS) · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "LASD MA SCC",
+      "freq_hz": 484212500,
+      "mode": "NFM",
+      "group": "LASD",
+      "step_hz": 12500,
+      "note": "Mutual Aid - SCC ACC (small cities access) *156.7 tone · may be retired (LASD moved to LA-RICS) · interceptradio.com"
+    },
+    {
+      "name": "HOTSHOT OAT",
+      "freq_hz": 484350000,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Hot Shots / Air / K9 (Oat Mtn) · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "ND1 RED 60",
+      "freq_hz": 484537500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.60 ND 1 Red (detectives) · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "ND2 BLUE 61",
+      "freq_hz": 484687500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.61 ND 2 Blue FDC ? tac LA Bureau FBI · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "MISSION 19",
+      "freq_hz": 484887500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.19r Mission/North Valley disp · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "VLY TRAF 23",
+      "freq_hz": 484912500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.23r Valley Traffic disp · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "W VALLEY 10",
+      "freq_hz": 484937500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.10r West Valley disp · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "N HOLLYWD 15",
+      "freq_hz": 484962500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.15r North Hollywood disp · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "ADMIN 59",
+      "freq_hz": 506362500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.59 Admin Net · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "STAFF 64",
+      "freq_hz": 506537500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.64 Staff/Command · carrier squelch · interceptradio.com"
+    },
+    {
+      "name": "VAN NUYS 9",
+      "freq_hz": 506712500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.9r Van Nuys disp · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "METRO 1",
+      "freq_hz": 506837500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.65 Metro 1 · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "DEVONSHIRE 17",
+      "freq_hz": 506887500,
+      "mode": "NFM",
+      "group": "LAPD (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.17r Devonshire disp · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "VLY TAC1 42",
+      "freq_hz": 507012500,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.42 Valley Tac 1 · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "VLY TAC2 43",
+      "freq_hz": 507225000,
+      "mode": "NFM",
+      "group": "LAPD Tac (P25)",
+      "step_hz": 12500,
+      "note": "LAPD Ch.43 Valley Tac 2 · NAC 466 · interceptradio.com",
+      "digital": "P25"
+    },
+    {
+      "name": "ITAC1",
+      "freq_hz": 866512500,
+      "mode": "NFM",
+      "group": "Interop",
+      "step_hz": 12500,
+      "note": "ITAC1 (LAFD F20) · 156.7 PL · interceptradio.com"
+    },
+    {
+      "name": "ITAC2",
+      "freq_hz": 867012500,
+      "mode": "NFM",
+      "group": "Interop",
+      "step_hz": 12500,
+      "note": "ITAC2 (LAFD F21) · 156.7 PL · interceptradio.com"
+    },
+    {
+      "name": "ITAC3",
+      "freq_hz": 867512500,
+      "mode": "NFM",
+      "group": "Interop",
+      "step_hz": 12500,
+      "note": "ITAC3 (LAFD F22) + LAX Crash Crews · 156.7 PL · interceptradio.com"
+    },
+    {
+      "name": "ITAC4",
+      "freq_hz": 868012500,
+      "mode": "NFM",
+      "group": "Interop",
+      "step_hz": 12500,
+      "note": "ITAC4 (LAFD F23) · 156.7 PL · interceptradio.com"
+    },
+    {
+      "name": "FIREMARS",
+      "freq_hz": 868987500,
+      "mode": "NFM",
+      "group": "Interop",
+      "step_hz": 12500,
+      "note": "FIREMARS (LAFD F24) · 156.7 PL · interceptradio.com"
+    }
+  ],
+  "collapsed": [
+    "LA Co Fire",
+    "LAFD Tac",
+    "LAPD Tac (P25)"
+  ]
 }
