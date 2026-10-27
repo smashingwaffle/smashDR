@@ -20,7 +20,7 @@
 1b. Scanner: memories, scan lists, band/range scan  <- next
 2. C4FM demod + symbol timing  <- done, verified on LAPD Hollenbeck (507.1875)
 3. P25 Phase 1 frame sync + NID (BCH 63,16)  <- done, verified on air
-4. Frame types HDU/LDU/TDU, FEC (Hamming, Golay, RS)  <- done, verified on air; TSBK next
+4. Frame types HDU/LDU/TDU, FEC (Hamming, Golay, RS)  <- done, verified on air; TSBK done (857.1625 / 857.4625)
 5. IMBE voice via mbelib-neo (ctypes)  <- done (97% frames 0 FEC errors on air)
 5b. Live P25 mode in the receiver (P25Live)  <- done, confirmed on air (Hollenbeck, "better than the SDS200")
 6. Trunking: control channel, follow grants
@@ -58,6 +58,13 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   gain/offset LS fit from the sync -> catches HDUs; NID ML BCH; collects
   whole frames), decode_frame_body (LC, ESS/ALGID, HDU, IMBE de-interleave
   formula), group_calls(), decode_recording()
+- `decoders/p25_tsbk.py` TSDU -> TSBKs: deinterleave (received i -> position IL[i]),
+  rate-1/2 trellis with the constellation->dibit-pair table, CRC-CCITT init 0 inverted.
+  Parses grants, IDEN_UP/VU/TDMA (IdenTable.freq), RFSS/NET/ADJ status, SCCB.
+  P25Live keeps system + grants and puts them in the 'cc' event. TSDU frame length
+  = 360 dibits max, framer resumes after the TSBK with LB set (_used).
+  Verified: 857.4625 = CCCS 45C site 21 grant TG 193 -> 857.9625 matched the voice
+  channel's LDU (AES). 857.1625 = BEE00-346 RFSS 1 site 6 (has Phase 2 idens).
 - `decoders/p25_fec.py` Hamming(10,6), Golay(24,12)/(18,6), RS over GF(64) (0x43,
   FCR 1) encode + decode. Matches the air: 0 corrections on clean frames.
 - `decoders/p25_live.py` P25Live: streaming chain + call state -> 48 kHz audio + events

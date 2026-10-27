@@ -189,7 +189,8 @@ def slice_dibits(syms: np.ndarray) -> np.ndarray:
 # Frame layout
 # --------------------------------------------------------------------------
 # frame lengths in dibits, from the first frame-sync dibit, status dibits included
-FRAME_DIBITS = {0x0: 396, 0x3: 72, 0x5: 864, 0xA: 864, 0xF: 216}
+FRAME_DIBITS = {0x0: 396, 0x3: 72, 0x5: 864, 0xA: 864, 0xF: 216,
+                0x7: 360}      # TSDU: room for 3 TSBKs; the real length comes from LB
 NID_ONLY_DIBITS = 57          # sync + NID + status, for frame types not decoded yet
 
 # LDU data-bit positions (status dibits removed): sync 48 + NID 64, then
@@ -303,6 +304,11 @@ def decode_frame_body(duid: int, bits: np.ndarray) -> dict:
                 info["kid"] = (es[10] << 8) | es[11]
                 info["encrypted"] = es[9] != 0x80
         info["imbe"] = np.stack([imbe_codewords(bits, st) for st in VOICE_STARTS])
+    elif duid == 0x7:
+        from smashdr.decoders.p25_tsbk import tsbks_from_tsdu, used_dibits
+        tsbks = tsbks_from_tsdu(bits)
+        info["tsbks"] = tsbks
+        info["_used"] = used_dibits(len(tsbks))
     elif duid == 0xF:
         # TDULC: 12 Golay(24,12) words after the NID -> 24 hexbits -> RS(24,12,13) -> LC
         hb, gerr = [], 0
@@ -389,7 +395,7 @@ class P25Framer:
                 self.pending = None
                 self._finish(f, rel, length)
                 found.append(f)
-                self.search_from = pos + length
+                self.search_from = pos + f.pop("_used", length)
                 continue
             f = self._next_sync()
             if f is None:

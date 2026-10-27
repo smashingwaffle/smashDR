@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.6.6"
+VERSION = "0.6.7"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1441,9 +1441,28 @@ class MainWindow(QtWidgets.QMainWindow):
                                      "<span style='color:gray'>(trunked: voice is on other "
                                      "channels; following them comes later)</span>")
                 return
-            self.p25_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  control channel  ·  "
-                                 f"NAC 0x{ev['nac']:03X}  ·  {ev['tsdu_per_s']:.0f} TSDU/s "
-                                 "<span style='color:gray'>(talkgroup decode comes next)</span>")
+            sysname = ""
+            if ev.get("sysid") is not None:
+                sysname = (f"system <b>{ev['wacn']:05X}-{ev['sysid']:03X}</b>" if ev.get("wacn") is not None
+                           else f"system <b>{ev['sysid']:03X}</b>")
+                if ev.get("site") is not None:
+                    sysname += f"  ·  RFSS {ev.get('rfss')} site {ev['site']}"
+                sysname += "  ·  "
+            grants = []
+            for g in (ev.get("active") or [])[:4]:
+                f = f"{g['freq'] / 1e6:.4f}" if g.get("freq") else f"ch {g['channel']}"
+                tg = f"TG <b>{g['tgid']}</b> → {f}"
+                if g.get("slot") is not None:
+                    tg += f" slot {g['slot'] + 1}"
+                if g.get("emergency"):
+                    tg += " <span style='color:#e53935'>EMERG</span>"
+                if g.get("encrypted"):
+                    tg += " <span style='color:#e53935'>enc</span>"
+                grants.append(tg)
+            now = ("  ·  now: " + ", ".join(grants)) if grants else \
+                "  ·  <span style='color:gray'>no calls right now</span>"
+            self.p25_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  P25 control channel  ·  {sysname}"
+                                 f"NAC 0x{ev['nac']:03X}{now}")
             return
         if self.presets_win is not None:
             self.presets_win.set_live(None if ev["type"] == "end" else self.target_hz)

@@ -12,12 +12,15 @@ call is clear; encrypted calls are reported but never decoded.
 Events (dicts): {"type": "start" | "update" | "end", "tgid", "src", "dst",
 "algid", "encrypted", "nac", "emergency", "duration"}
 plus, once a second while a control channel is being received,
-{"type": "cc", "nac", "tsdu_per_s"}.
+{"type": "cc", "nac", "tsdu_per_s", "wacn", "sysid", "rfss", "site", "active", "recent"}
+where active / recent are lists of grants {"tgid", "src", "freq", "slot",
+"emergency", "encrypted", "t"} (active = refreshed in the last 3 s).
 """
 
 import numpy as np
 
 from smashdr.decoders import p25
+from smashdr.decoders.p25_tsbk import IdenTable
 from smashdr.core.dsp import StreamFir, lowpass_taps
 
 GAP_S = 0.6                 # silence that separates transmissions
@@ -52,6 +55,9 @@ class P25Live:
         self._cc_count = 0
         self._cc_nac = None
         self._cc_t = 0.0
+        self.system = {}                    # wacn, sysid, rfss, site from the broadcasts
+        self.iden = IdenTable()
+        self.grants = {}                    # (tgid, freq) -> grant dict
 
     def set_offset(self, offset_hz: float):
         self.rx.chan.set_offset(offset_hz)
@@ -67,12 +73,51 @@ class P25Live:
             self._end(events)
         if self.t_now - self._cc_t >= 1.0:
             if self._cc_count:
-                events.append({"type": "cc", "nac": self._cc_nac,
-                               "tsdu_per_s": self._cc_count / (self.t_now - self._cc_t)})
+                events.append(self._cc_event(self._cc_count / (self.t_now - self._cc_t)))
             self._cc_count = 0
             self._cc_t = self.t_now
         audio8 = np.concatenate(pcm) if pcm else np.zeros(0, dtype=np.int16)
         return self.up(audio8), events
+
+    def _tsbk(self, m, t):
+        self.iden.update(m)
+        name = m["name"]
+        if name in ("RFSS_STS_BCST", "NET_STS_BCST"):
+            for k in ("wacn", "sysid", "rfss", "site"):
+                if k in m:
+                    self.system[k] = m[k]
+        grants = []
+        if name in ("GRP_V_CH_GRANT", "GRP_V_CH_GRANT_UPDT_EXP"):
+            grants.append((m["tgid"], m["channel"], m.get("src"), m.get("emergency", False),
+                           m.get("encrypted", False)))
+        elif name == "GRP_V_CH_GRANT_UPDT":
+            grants.append((m["tgid"], m["channel"], None, False, None))
+            if m.get("tgid_b") and m["tgid_b"] != m["tgid"]:
+                grants.append((m["tgid_b"], m["channel_b"], None, False, None))
+        for tg, ch, src, emerg, enc in grants:
+            freq = self.iden.freq(ch)
+            key = (tg, freq if freq is not None else ("ch", ch))
+            g = self.grants.get(key)
+            if g is None:
+                g = self.grants[key] = {"tgid": tg, "src": src, "freq": freq, "channel": ch,
+                                        "slot": self.iden.slot(ch), "emergency": emerg,
+                                        "encrypted": enc, "first": t}
+            g["t"] = t
+            if src is not None:
+                g["src"] = src
+            g["emergency"] = g["emergency"] or emerg
+            if enc is not None:
+                g["encrypted"] = enc
+        if len(self.grants) > 200:
+            for k in sorted(self.grants, key=lambda k: self.grants[k]["t"])[:100]:
+                del self.grants[k]
+
+    def _cc_event(self, rate):
+        now = self.t_now
+        recent = sorted(self.grants.values(), key=lambda g: -g["t"])
+        return dict(self.system, type="cc", nac=self._cc_nac, tsdu_per_s=rate,
+                    active=[dict(g) for g in recent if now - g["t"] <= 3.0],
+                    recent=[dict(g, ago=now - g["t"]) for g in recent[:8]])
 
     # ------------------------------------------------------------------
     def _snapshot(self, kind):
@@ -100,6 +145,8 @@ class P25Live:
             if d == 0x7:                                  # trunking control channel
                 self._cc_count += 1
                 self._cc_nac = f["nac"]
+                for m in f.get("tsbks", []):
+                    self._tsbk(m, f["t"])
             return
         if self.call is None or d == 0x0 or f["t"] - self.call["last"] > GAP_S:
             if d in (0x3, 0xF) and self.call is None:
