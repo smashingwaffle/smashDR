@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.6.4"
+VERSION = "0.6.5"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1328,6 +1328,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if ev["type"] == "cc":
             if self.p25_lbl.text().startswith("<span style='color:#43a047'>●"):
                 return                                    # a call is showing; leave it
+            if ev.get("proto") == "DMR":
+                self.p25_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  DMR control channel  ·  "
+                                     f"colour code {ev['cc']}  ·  {ev['csbk_per_s']:.0f} CSBK/s "
+                                     "<span style='color:gray'>(trunked: voice is on other "
+                                     "channels; following them comes later)</span>")
+                return
             self.p25_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  control channel  ·  "
                                  f"NAC 0x{ev['nac']:03X}  ·  {ev['tsdu_per_s']:.0f} TSDU/s "
                                  "<span style='color:gray'>(talkgroup decode comes next)</span>")

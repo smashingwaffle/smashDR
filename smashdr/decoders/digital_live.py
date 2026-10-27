@@ -193,6 +193,8 @@ class DmrLive(_LiveBase):
         self.pending = []                  # (abs sync index, gain, offset, slot)
         self.done = set()
         self.cc = None
+        self._csbk = {}                    # colour code -> CSBK count this second
+        self._csbk_t = 0.0
 
     def _snap(self, kind, slot):
         c = self.calls[slot]
@@ -248,6 +250,8 @@ class DmrLive(_LiveBase):
             t = self.t(i)
             if kind == "d":
                 cc, dt = dmr.slot_type(burst)
+                if dt == 3:                             # CSBK: control signalling
+                    self._csbk[cc] = self._csbk.get(cc, 0) + 1
                 if dt in (0, 1, 2):
                     if dt == 0:                         # privacy header: encrypted call
                         if self.calls[slot] is None:
@@ -293,6 +297,15 @@ class DmrLive(_LiveBase):
                     pcm.append(a)
         self.pending = keep
         now = self.t(st.end)
+        if now - self._csbk_t >= 1.0:
+            n = sum(self._csbk.values())
+            # a control channel sends CSBKs nonstop (~33/s); a voice repeater only a few
+            if n >= 10 and all(c is None for c in self.calls.values()):
+                cc = max(self._csbk, key=self._csbk.get)
+                events.append({"type": "cc", "proto": "DMR", "cc": cc,
+                               "csbk_per_s": n / (now - self._csbk_t)})
+            self._csbk = {}
+            self._csbk_t = now
         for slot in (1, 2):
             c = self.calls[slot]
             if c is not None and now - c["last"] > END_TIMEOUT_S:
