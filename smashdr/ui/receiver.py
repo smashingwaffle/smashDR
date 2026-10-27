@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1314,6 +1314,7 @@ class MainWindow(QtWidgets.QMainWindow):
             half = MODES[self.mode]["half_bw"]
             if abs(hz - self.center_hz) + half > 0.42 * self.rate_hz:
                 self.reader.request(center=hz + self._offset_hz())
+                self._click_block_until = time.time() + 0.6
                 self.rec_btn.setChecked(False)
         elif self.center_hz is None:
             self.reader.request(center=hz + self._offset_hz())
@@ -1556,6 +1557,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _plot_clicked(self, ev, plot):
         vb = plot.plotItem.vb
+        # a double click (or a second click while the span is still moving) would be
+        # mapped onto the new span and tune somewhere else
+        if ev.double() or time.time() < getattr(self, "_click_block_until", 0.0):
+            return
         if ev.button() == QtCore.Qt.MouseButton.LeftButton and \
                 vb.sceneBoundingRect().contains(ev.scenePos()):
             self._tune(vb.mapSceneToView(ev.scenePos()).x() * 1e6, snap=True)
