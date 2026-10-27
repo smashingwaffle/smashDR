@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.6.9"
+VERSION = "0.6.10"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -531,11 +531,10 @@ class TagStrip(pg.PlotWidget):
         self.setYRange(0, self.ROWS, padding=0)
         self.setMouseEnabled(x=False, y=False)
         self._tooltip_fn, self._on_click = tooltip_fn, on_click
-        self._items, self._hits = [], []        # hits: (x0 px, x1 px, row, presets)
+        self._items, self._hits = [], []        # hits: (freq MHz, half label width px, row, presets)
         self._presets, self._span = [], None
         self._font = QtGui.QFont("Segoe UI", 8)
-        self.scene().sigMouseMoved.connect(self._hover)
-        self.scene().sigMouseClicked.connect(self._click)
+        self.setMouseTracking(True)
 
     def set_tags(self, presets, lo_hz, hi_hz):
         self._presets, self._span = presets, (lo_hz, hi_hz)
@@ -579,7 +578,7 @@ class TagStrip(pg.PlotWidget):
             self.addItem(tick)
             self._items.append(tick)
             if row is None:                       # no room: tick only, name in the tooltip
-                self._hits.append((x - 4, x + 4, 0, ps))
+                self._hits.append((f / 1e6, 4, -1, ps))
                 continue
             row_end[row] = x0 + tw
             t = pg.TextItem(name, color=colour, anchor=(0.5, 0.0))
@@ -587,36 +586,46 @@ class TagStrip(pg.PlotWidget):
             t.setPos(f / 1e6, y_top - 0.05)
             self.addItem(t)
             self._items.append(t)
-            self._hits.append((x0, x0 + tw, row, ps))
+            self._hits.append((f / 1e6, tw / 2, row, ps))
 
-    def _at(self, scene_pos):
+    def _at(self, pos):
+        """Presets under widget position pos (QPoint/QPointF), or None."""
         vb = self.plotItem.vb
-        r = vb.sceneBoundingRect()
-        if not r.contains(scene_pos):
+        sp = self.mapToScene(QtCore.QPoint(int(pos.x()), int(pos.y())))
+        if not vb.sceneBoundingRect().contains(sp):
             return None
-        x = scene_pos.x() - r.left()
-        row = int((scene_pos.y() - r.top()) / max(1.0, r.height() / self.ROWS))
-        best = None
-        for x0, x1, rw, ps in self._hits:
-            if x0 - 2 <= x <= x1 + 2:
-                if rw == row:
-                    return ps
-                best = best or ps
-        return best
+        (x0v, x1v), _ = vb.viewRange()
+        px_per_mhz = vb.width() / max(1e-9, x1v - x0v)
+        x_mhz = vb.mapSceneToView(sp).x()
+        r = vb.sceneBoundingRect()
+        row = int((sp.y() - r.top()) / max(1.0, r.height() / self.ROWS))
+        best, best_d = None, 1e9
+        for f_mhz, half_px, rw, ps in self._hits:
+            d = abs(x_mhz - f_mhz) * px_per_mhz
+            if d <= half_px + 2 and rw == row:
+                return ps                                   # on the label itself
+            if d < best_d:
+                best, best_d = ps, d
+        return best if best_d <= 10 else None               # near a tick
 
-    def _hover(self, scene_pos):
-        ps = self._at(scene_pos)
+    def mouseMoveEvent(self, ev):
+        super().mouseMoveEvent(ev)
+        ps = self._at(ev.position())
         if ps:
             QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), self._tooltip_fn(ps), self)
+            self.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
         else:
             QtWidgets.QToolTip.hideText()
+            self.unsetCursor()
 
-    def _click(self, ev):
-        if ev.button() != QtCore.Qt.MouseButton.LeftButton:
-            return
-        ps = self._at(ev.scenePos())
-        if ps:
-            self._on_click(ps[0])
+    def mousePressEvent(self, ev):
+        if ev.button() == QtCore.Qt.MouseButton.LeftButton:
+            ps = self._at(ev.position())
+            if ps:
+                self._on_click(ps[0])
+                ev.accept()
+                return
+        super().mousePressEvent(ev)
 
 
 # --------------------------------------------------------------------------
