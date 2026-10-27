@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.6.5"
+VERSION = "0.6.6"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -516,6 +516,106 @@ class BandStrip(pg.PlotWidget):
                 self._items.append(t)
 
 
+class TagStrip(pg.PlotWidget):
+    """Preset names under the waterfall, written horizontally (x in MHz).
+    Overlapping names go to a second / third row; hover = tooltip, click = tune."""
+
+    ROWS = 3
+    ROW_PX = 16
+
+    def __init__(self, on_wheel, tooltip_fn, on_click):
+        super().__init__(viewBox=TuneViewBox(on_wheel))
+        self.setFixedHeight(self.ROWS * self.ROW_PX + 6)
+        self.hideAxis("left")
+        self.hideAxis("bottom")
+        self.setYRange(0, self.ROWS, padding=0)
+        self.setMouseEnabled(x=False, y=False)
+        self._tooltip_fn, self._on_click = tooltip_fn, on_click
+        self._items, self._hits = [], []        # hits: (x0 px, x1 px, row, presets)
+        self._presets, self._span = [], None
+        self._font = QtGui.QFont("Segoe UI", 8)
+        self.scene().sigMouseMoved.connect(self._hover)
+        self.scene().sigMouseClicked.connect(self._click)
+
+    def set_tags(self, presets, lo_hz, hi_hz):
+        self._presets, self._span = presets, (lo_hz, hi_hz)
+        self.redraw()
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        self.redraw()
+
+    def redraw(self):
+        for it in self._items:
+            self.removeItem(it)
+        self._items, self._hits = [], []
+        if not self._span or not self._presets:
+            return
+        lo, hi = self._span
+        w = max(1.0, self.plotItem.vb.width() or self.width())
+        px_per_hz = w / (hi - lo)
+        fm = QtGui.QFontMetrics(self._font)
+        groups = {}
+        for p in self._presets:
+            if lo < p["freq_hz"] < hi:
+                groups.setdefault(p["freq_hz"], []).append(p)
+        row_end = [-1e9] * self.ROWS             # right edge (px) used per row
+        for f in sorted(groups):
+            ps = groups[f]
+            name = ps[0]["name"] if len(ps[0]["name"]) <= TAG_CHARS else ps[0]["name"][:TAG_CHARS - 1] + "…"
+            if len(ps) > 1:
+                name += f" +{len(ps) - 1}"
+            tw = fm.horizontalAdvance(name) + 8
+            x = (f - lo) * px_per_hz
+            x0 = x - tw / 2
+            row = next((r for r in range(self.ROWS) if x0 > row_end[r] + 3), None)
+            colour = "#b4a7d6" if ps[0].get("digital") else "#bdbdbd"
+            y_top = self.ROWS - (row if row is not None else 0)
+            tick = QtWidgets.QGraphicsLineItem(f / 1e6, self.ROWS, f / 1e6, y_top - 0.15)
+            tick.setPen(pg.mkPen(colour, width=1, style=QtCore.Qt.PenStyle.DotLine))
+            self.addItem(tick)
+            self._items.append(tick)
+            if row is None:                       # no room: tick only, name in the tooltip
+                self._hits.append((x - 4, x + 4, 0, ps))
+                continue
+            row_end[row] = x0 + tw
+            t = pg.TextItem(name, color=colour, anchor=(0.5, 0.0))
+            t.setFont(self._font)
+            t.setPos(f / 1e6, y_top - 0.05)
+            self.addItem(t)
+            self._items.append(t)
+            self._hits.append((x0, x0 + tw, row, ps))
+
+    def _at(self, scene_pos):
+        vb = self.plotItem.vb
+        r = vb.sceneBoundingRect()
+        if not r.contains(scene_pos):
+            return None
+        x = scene_pos.x() - r.left()
+        row = int((scene_pos.y() - r.top()) / max(1.0, r.height() / self.ROWS))
+        best = None
+        for x0, x1, rw, ps in self._hits:
+            if x0 - 2 <= x <= x1 + 2:
+                if rw == row:
+                    return ps
+                best = best or ps
+        return best
+
+    def _hover(self, scene_pos):
+        ps = self._at(scene_pos)
+        if ps:
+            QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), self._tooltip_fn(ps), self)
+        else:
+            QtWidgets.QToolTip.hideText()
+
+    def _click(self, ev):
+        if ev.button() != QtCore.Qt.MouseButton.LeftButton:
+            return
+        ps = self._at(ev.scenePos())
+        if ps:
+            self._on_click(ps[0])
+
+
 # --------------------------------------------------------------------------
 # Main window
 # --------------------------------------------------------------------------
@@ -709,7 +809,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wf_plot.addItem(self.wf_marker)
         self.spec_plot.hideAxis("bottom")
 
-        self.spec_plot.scene().sigMouseMoved.connect(self._tag_hover)
+        self.tag_strip = TagStrip(self._wheel_tune, self._tag_tooltip, self._tune_preset)
+        self.tag_strip.setXLink(self.wf_plot)
         for p in (self.band_strip, self.spec_plot, self.wf_plot):
             p.scene().sigMouseClicked.connect(
                 lambda ev, plot=p: self._plot_clicked(ev, plot))
@@ -727,7 +828,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         split.addWidget(plots)
-        split.addWidget(self.wf_plot)
+        wf_box = QtWidgets.QWidget()
+        wl = QtWidgets.QVBoxLayout(wf_box)
+        wl.setContentsMargins(0, 0, 0, 0)
+        wl.setSpacing(0)
+        wl.addWidget(self.wf_plot, 1)
+        wl.addWidget(self.tag_strip)
+        split.addWidget(wf_box)
         split.setSizes([360, 420])
 
         self.tx_view = QtWidgets.QTextBrowser()
@@ -941,7 +1048,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.avg_box.addItems(list(AVERAGING))
         self.avg_box.setCurrentText(opts["averaging"])
 
-        self.tags_chk = QtWidgets.QCheckBox("Label preset frequencies on the spectrum")
+        self.tags_chk = QtWidgets.QCheckBox("Label preset frequencies under the waterfall")
         self.tags_chk.setChecked(bool(opts["preset_tags"]))
         self.tags_chk.toggled.connect(lambda _on: self._draw_preset_tags())
 
@@ -1608,53 +1715,15 @@ class MainWindow(QtWidgets.QMainWindow):
             rows.append(line)
         return "<p style='white-space:pre-wrap; max-width:420px'>" + "<hr>".join(rows) + "</p>"
 
-    def _tag_hover(self, scene_pos):
-        """Tooltip for the preset tag under the mouse (top part of the spectrum)."""
-        info = getattr(self, "_tag_info", None)
-        vb = self.spec_plot.getViewBox()
-        if not info or not vb.sceneBoundingRect().contains(scene_pos):
-            QtWidgets.QToolTip.hideText()
-            return
-        pt = vb.mapSceneToView(scene_pos)
-        if pt.y() < -45:                             # tags hang from the top edge
-            QtWidgets.QToolTip.hideText()
-            return
-        best, best_px = None, 7.0
-        for f_mhz, tip in info:
-            px = abs(vb.mapViewToScene(QtCore.QPointF(f_mhz, pt.y())).x() - scene_pos.x())
-            if px < best_px:
-                best, best_px = tip, px
-        if best:
-            QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), best, self.spec_plot)
-        else:
-            QtWidgets.QToolTip.hideText()
-
     def _draw_preset_tags(self):
-        """Short vertical name tags at the top of the spectrum for presets in view."""
-        for it in self._tag_items:
-            self.spec_plot.removeItem(it)
-        self._tag_items = []
-        self._tag_info = []                          # (freq MHz, tooltip html)
-        if not self.tags_chk.isChecked() or self.center_hz is None:
+        """Preset names in the strip under the waterfall."""
+        show = self.tags_chk.isChecked() and self.center_hz is not None
+        self.tag_strip.setVisible(self.tags_chk.isChecked())
+        if not show:
+            self.tag_strip.set_tags([], 0, 1)
             return
-        lo = self.center_hz - self.rate_hz / 2
-        hi = self.center_hz + self.rate_hz / 2
-        seen = set()
-        for p in self._tag_presets:
-            f = p["freq_hz"]
-            if not lo < f < hi or f in seen:
-                continue
-            seen.add(f)
-            name = p["name"] if len(p["name"]) <= TAG_CHARS else p["name"][:TAG_CHARS - 1] + "…"
-            color = "#b4a7d6" if p.get("digital") else "#9e9e9e"
-            t = pg.TextItem(name, color=color, angle=90, anchor=(1.0, 0.5))
-            t.setFont(QtGui.QFont("Segoe UI", 8))
-            t.setPos(f / 1e6, -11)
-            t.setZValue(-5)
-            self.spec_plot.addItem(t)
-            self._tag_items.append(t)
-            same = [q for q in self._tag_presets if q["freq_hz"] == f]
-            self._tag_info.append((f / 1e6, self._tag_tooltip(same)))
+        self.tag_strip.set_tags(self._tag_presets, self.center_hz - self.rate_hz / 2,
+                                self.center_hz + self.rate_hz / 2)
 
     def on_frame(self, spec, center, rate, stats):
         if center != self.center_hz or rate != self.rate_hz:
