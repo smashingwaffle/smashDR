@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.7.4"
+VERSION = "0.7.5"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -529,8 +529,8 @@ class TagStrip(pg.PlotWidget):
     """Preset names under the waterfall, written horizontally (x in MHz).
     Overlapping names go to a second / third row; hover = tooltip, click = tune."""
 
-    ROWS = 3
-    ROW_PX = 16
+    ROWS = 4
+    ROW_PX = 15
 
     def __init__(self, on_wheel, tooltip_fn, on_click):
         super().__init__(viewBox=TuneViewBox(on_wheel))
@@ -578,13 +578,14 @@ class TagStrip(pg.PlotWidget):
         row_end = [-1e9] * self.ROWS             # right edge (px) used per row
         for f in sorted(groups):
             ps = groups[f]
-            name = ps[0]["name"] if len(ps[0]["name"]) <= TAG_CHARS else ps[0]["name"][:TAG_CHARS - 1] + "…"
-            if len(ps) > 1:
-                name += f" +{len(ps) - 1}"
-            tw = fm.horizontalAdvance(name) + 8
             x = (f - lo) * px_per_hz
-            x0 = x - tw / 2
-            row = next((r for r in range(self.ROWS) if x0 > row_end[r] + 3), None)
+            row = None
+            for name in self._labels(ps):              # full name first, then shorter ones
+                tw = fm.horizontalAdvance(name) + 6
+                x0 = x - tw / 2
+                row = next((r for r in range(self.ROWS) if x0 > row_end[r] + 2), None)
+                if row is not None:
+                    break
             colour = "#b4a7d6" if ps[0].get("digital") else "#bdbdbd"
             y_top = self.ROWS - (row if row is not None else 0)
             tick = QtWidgets.QGraphicsLineItem(f / 1e6, self.ROWS, f / 1e6, y_top - 0.15)
@@ -601,6 +602,26 @@ class TagStrip(pg.PlotWidget):
             self.addItem(t)
             self._items.append(t)
             self._hits.append((f / 1e6, tw / 2, row, ps))
+
+    _SHORT = (("CHP ", ""), ("LAPD ", ""), (" base", " B"), (" mob", " M"), ("Dispatch", "Disp"),
+              ("dispatch", "disp"), ("Command", "Cmd"), ("Tactical", "Tac"), ("Highway", "Hwy"))
+
+    @classmethod
+    def _labels(cls, ps):
+        """Label candidates, longest first: the name, an abbreviated one, its first 6 chars."""
+        name = ps[0]["name"]
+        more = f" +{len(ps) - 1}" if len(ps) > 1 else ""
+        full = (name if len(name) <= TAG_CHARS else name[:TAG_CHARS - 1] + "…") + more
+        short = ps[0].get("tag") or name
+        for a, b in cls._SHORT:
+            short = short.replace(a, b)
+        short = short.strip()
+        out = [full]
+        cands = [short + more] + ([short[:6].rstrip() + more] if len(short) > 8 else [])
+        for c in cands:
+            if c not in out:
+                out.append(c)
+        return out
 
     def _at(self, pos):
         """Presets under widget position pos (QPoint/QPointF), or None."""
