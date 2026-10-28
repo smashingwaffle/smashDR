@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.7.5"
+VERSION = "0.7.6"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -471,7 +471,12 @@ class SdrReader(QtCore.QThread):
 # Plot helpers
 # --------------------------------------------------------------------------
 class TuneViewBox(pg.ViewBox):
-    """ViewBox where the wheel tunes instead of zooming, and dragging does nothing."""
+    """ViewBox where the wheel tunes; Ctrl+wheel zooms around the mouse,
+    middle-drag pans, middle-click resets the zoom (hooks set by MainWindow)."""
+
+    zoom_hook = None          # (factor, x_mhz)
+    pan_hook = None           # (dx_mhz)
+    reset_hook = None         # ()
 
     def __init__(self, on_wheel, **kw):
         super().__init__(**kw)
@@ -481,12 +486,27 @@ class TuneViewBox(pg.ViewBox):
 
     def wheelEvent(self, ev, axis=None):
         d = ev.delta() if hasattr(ev, "delta") else ev.angleDelta().y()
-        if d:
+        if d and (ev.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier) and TuneViewBox.zoom_hook:
+            TuneViewBox.zoom_hook(1.25 if d > 0 else 1 / 1.25, self.mapToView(ev.pos()).x())
+        elif d:
             self._on_wheel(1 if d > 0 else -1)
         ev.accept()
 
     def mouseDragEvent(self, ev, axis=None):
-        ev.ignore()
+        if ev.button() == QtCore.Qt.MouseButton.MiddleButton and TuneViewBox.pan_hook:
+            ev.accept()
+            a = self.mapToView(ev.lastPos()).x()
+            b = self.mapToView(ev.pos()).x()
+            TuneViewBox.pan_hook(a - b)
+        else:
+            ev.ignore()
+
+    def mouseClickEvent(self, ev):
+        if ev.button() == QtCore.Qt.MouseButton.MiddleButton and TuneViewBox.reset_hook:
+            ev.accept()
+            TuneViewBox.reset_hook()
+        else:
+            super().mouseClickEvent(ev)
 
 
 class BandStrip(pg.PlotWidget):
@@ -550,8 +570,12 @@ class TagStrip(pg.PlotWidget):
 
     def set_tags(self, presets, lo_hz, hi_hz):
         self._presets, self._span = presets, (lo_hz, hi_hz)
-        if hi_hz > lo_hz:
-            self.setXRange(lo_hz / 1e6, hi_hz / 1e6, padding=0)
+        self.redraw()
+
+    def set_view(self, lo_mhz, hi_mhz):
+        """Follow the waterfall's visible range (zoom / pan)."""
+        self._view = (lo_mhz * 1e6, hi_mhz * 1e6)
+        self.setXRange(lo_mhz, hi_mhz, padding=0)
         self.redraw()
 
     def resizeEvent(self, ev):
@@ -567,13 +591,16 @@ class TagStrip(pg.PlotWidget):
         self._items, self._hits = [], []
         if not self._span or not self._presets:
             return
-        lo, hi = self._span
+        lo, hi = getattr(self, "_view", None) or self._span     # pixel mapping: what's visible
+        show_lo, show_hi = max(lo, self._span[0]), min(hi, self._span[1])
+        if hi <= lo or show_hi <= show_lo:
+            return
         w = max(1.0, self.plotItem.vb.width() or self.width())
         px_per_hz = w / (hi - lo)
         fm = QtGui.QFontMetrics(self._font)
         groups = {}
         for p in self._presets:
-            if lo < p["freq_hz"] < hi:
+            if show_lo < p["freq_hz"] < show_hi:
                 groups.setdefault(p["freq_hz"], []).append(p)
         row_end = [-1e9] * self.ROWS             # right edge (px) used per row
         for f in sorted(groups):
@@ -855,10 +882,19 @@ class MainWindow(QtWidgets.QMainWindow):
                                          pen=pg.mkPen("#ffd54f", width=1))
         self.wf_plot.addItem(self.wf_marker)
         self.spec_plot.hideAxis("bottom")
+        # zoom: the waterfall keeps its own y range; x follows the spectrum (linked)
+        self.wf_plot.getViewBox().disableAutoRange()
+        self.wf_plot.setYRange(0, WF_ROWS, padding=0)
+        TuneViewBox.zoom_hook = self._zoom
+        TuneViewBox.pan_hook = self._pan
+        TuneViewBox.reset_hook = self._zoom_reset
+        self._zoom_w = None                       # visible width in MHz, None = full span
 
-        # not x-linked: pyqtgraph links by screen position and the strip fed ranges back
-        # into the waterfall/spectrum; set_tags() gives it the span explicitly
+        # not x-linked (it fed ranges back into the waterfall); it follows the waterfall's
+        # visible range one way instead
         self.tag_strip = TagStrip(self._wheel_tune, self._tag_tooltip, self._tune_preset)
+        self.wf_plot.getViewBox().sigXRangeChanged.connect(
+            lambda _vb, r: self.tag_strip.set_view(*r))
         for p in (self.band_strip, self.spec_plot, self.wf_plot):
             p.scene().sigMouseClicked.connect(
                 lambda ev, plot=p: self._plot_clicked(ev, plot))
@@ -1832,6 +1868,36 @@ class MainWindow(QtWidgets.QMainWindow):
             rows.append(line)
         return "<p style='white-space:pre-wrap; max-width:420px'>" + "<hr>".join(rows) + "</p>"
 
+    # ---- zoom (Ctrl+wheel), pan (middle drag), reset (middle click) ----------
+    def _full_span(self):
+        if self.center_hz is None:
+            return None
+        return (self.center_hz - self.rate_hz / 2) / 1e6, self.rate_hz / 1e6
+
+    def _set_view(self, lo, width):
+        full = self._full_span()
+        if full is None:
+            return
+        f0, span = full
+        width = min(max(width, span / 64), span)
+        lo = min(max(lo, f0), f0 + span - width)
+        self._zoom_w = None if width >= span * 0.999 else width
+        self.spec_plot.setXRange(lo, lo + width, padding=0)
+
+    def _zoom(self, factor, x_mhz):
+        (lo, hi), _ = self.spec_plot.getViewBox().viewRange()
+        w = (hi - lo) / factor
+        self._set_view(x_mhz - (x_mhz - lo) / factor, w)
+
+    def _pan(self, dx_mhz):
+        (lo, hi), _ = self.spec_plot.getViewBox().viewRange()
+        self._set_view(lo + dx_mhz, hi - lo)
+
+    def _zoom_reset(self):
+        full = self._full_span()
+        if full:
+            self._set_view(full[0], full[1])
+
     def _draw_preset_tags(self):
         """Preset names in the strip under the waterfall."""
         show = self.tags_chk.isChecked() and self.center_hz is not None
@@ -1853,7 +1919,10 @@ class MainWindow(QtWidgets.QMainWindow):
             f0 = self.freqs_mhz[0]
             span = rate / 1e6
             self._wf_rect = QtCore.QRectF(f0, 0, span, WF_ROWS)
-            self.spec_plot.setXRange(f0, f0 + span, padding=0)
+            if self._zoom_w is None:
+                self.spec_plot.setXRange(f0, f0 + span, padding=0)
+            else:                                     # keep the zoom, centred on the channel
+                self._set_view(self.target_hz / 1e6 - self._zoom_w / 2, self._zoom_w)
             self.band_strip.redraw(center - rate / 2, center + rate / 2)
             self._draw_preset_tags()
 
