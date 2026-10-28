@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.7.6"
+VERSION = "0.7.7"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1355,6 +1355,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if hasattr(self, "cc_lbl") and abs(hz - self.target_hz) > 1000:
             self.cc_lbl.clear()                     # another channel: its own system info follows
             self.cc_lbl.hide()
+            self._grant_markers([])
         self.target_hz = hz
         self.vfo.setValue(hz)
 
@@ -1408,6 +1409,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._update_region()
         if hasattr(self, "cc_lbl") and self.mode not in DIGITAL_MODES:
             self.cc_lbl.hide()
+            self._grant_markers([])
         if hasattr(self, "p25_lbl"):
             self.p25_lbl.setVisible(self.mode in DIGITAL_MODES)
             if self.mode in DIGITAL_MODES and not self.p25_lbl.text():
@@ -1540,6 +1542,32 @@ class MainWindow(QtWidgets.QMainWindow):
                    "phase 2": ("#9e9e9e", "Phase 2, not yet"), "out of span": ("#9e9e9e", "outside the span"),
                    "busy": ("#9e9e9e", "not followed (max 3)"), "no plan": ("#9e9e9e", "waiting for the band plan")}
 
+    GRANT_COLOURS = {"playing": "#43a047", "clear": "#66bb6a", "encrypted": "#e53935",
+                     "checking": "#bdbdbd", "phase 2": "#8e7cc3", "busy": "#9e9e9e"}
+
+    def _grant_markers(self, grants):
+        """Coloured flags on the spectrum for each voice frequency being followed."""
+        for it in getattr(self, "_gm_items", []):
+            self.spec_plot.removeItem(it)
+        self._gm_items = []
+        seen = set()
+        for g in grants:
+            f, state = g.get("freq"), g.get("state")
+            if not f or state in ("out of span", "no plan") or f in seen:
+                continue
+            seen.add(f)
+            col = self.GRANT_COLOURS.get(state, "#bdbdbd")
+            line = pg.InfiniteLine(pos=f / 1e6, angle=90, movable=False,
+                                   pen=pg.mkPen(col, width=2, style=QtCore.Qt.PenStyle.DashLine))
+            word = {"playing": "▶ ", "encrypted": "🔒 "}.get(state, "")
+            label = pg.TextItem(f"{word}TG {g['tgid']}", color=col, anchor=(0.5, 1.0),
+                                fill=pg.mkBrush(0, 0, 0, 170))
+            label.setPos(f / 1e6, -12)
+            for it in (line, label):
+                it.setZValue(20)
+                self.spec_plot.addItem(it)
+                self._gm_items.append(it)
+
     def _show_cc(self, ev):
         """Control channel line: system, site and the grants being followed."""
         if ev.get("proto") == "DMR":
@@ -1564,6 +1592,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if g.get("emergency"):
                 tg += " <span style='color:#e53935'><b>EMERGENCY</b></span>"
             grants.append(tg)
+        self._grant_markers(ev.get("active") or [])
         now = ("<br>" + "  ·  ".join(grants)) if grants else \
             "  ·  <span style='color:gray'>no calls right now</span>"
         self.cc_lbl.setText(f"<span style='color:#8e7cc3'>■</span>  P25 control channel  ·  {sysname}"
