@@ -26,6 +26,7 @@
 6. Trunking: control channel, follow grants  <- P25 in progress: P25Trunk follows grants inside the span
 7. DMR (4FSK, TDMA bursts, AMBE+2)  <- done offline + live mode (446.82 CC1 TG 91 decoded, voice ok)
 7b. Fusion / YSF DN  <- done offline + live mode (449.34 AA6RJ/R, VE6DBD; voice ok)
+7c. D-STAR  <- done offline + live mode (446.56 KI6MGN C, KJ6ACO; 1299 frames ~0 errors)
 8. P25 Phase 2
 UX comes after the decode chain works.
 
@@ -95,6 +96,11 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   xorout FFFF over sent bytes), header CSD1, DN DCH callsigns by FN, DN voice
   (VCH deinterleave argsort(26*(j%4)+j//4), whiten, 27x3 vote + 22 -> 49 bits).
   VD1 / VW voice not done.
+- `decoders/dstar.py` D-STAR: syncs, 660-bit header (LFSR x^7+x^4+1 seed 7F scramble,
+  DSD deinterleave k+=24, K=3 Viterbi G1=7 G2=5, 41 bytes LSB first, FCS X.25 LE),
+  voice 72 bits -> ambe_fr via DW/DX -> vocoder decode_dstar (mbe 3600x2400),
+  slow data XOR 70 4F 93, 6-byte blocks (0x5n header copy, 0x4n message).
+  DstarLive (digital_live) reuses the C4FM front end: GMSK sign = bit.
 - `decoders/digital_live.py` DmrLive / YsfLive: shared _SymStream (channelizer +
   P25 C4FMDemod + absolute-index symbol buffer); same event shape as P25Live
   plus 'proto'. vocoder.AmbeDecoder: decode_frame (DMR) / decode_params (YSF).

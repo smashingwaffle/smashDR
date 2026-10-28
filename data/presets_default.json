@@ -1946,6 +1946,15 @@
       "step_hz": 12500,
       "digital": "P25",
       "note": "P25 control channel · WACN 92065 system 0D5 (seen on air by Stefaan, 2026-10-26)"
+    },
+    {
+      "name": "KI6MGN C",
+      "freq_hz": 446560000,
+      "mode": "NFM",
+      "group": "Ham digital",
+      "step_hz": 5000,
+      "digital": "DSTAR",
+      "note": "D-STAR, PAPA, Santiago Peak (D3) · module C, gateway KI6MGN G · heard by Stefaan 2026-10-27"
     }
   ],
   "collapsed": [

@@ -73,6 +73,13 @@ def load_library(path=None):
         lib.mbe_processAmbe2450Data.restype = ctypes.c_int
     except AttributeError:
         pass                                   # old library: IMBE only
+    try:                                       # AMBE 3600x2400 (D-STAR)
+        lib.mbe_processAmbe3600x2400Frame.argtypes = [
+            ctypes.POINTER(ctypes.c_short), ctypes.POINTER(_Result), ctypes.POINTER(ctypes.c_char * 24 * 4),
+            ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        lib.mbe_processAmbe3600x2400Frame.restype = ctypes.c_int
+    except AttributeError:
+        pass                                   # old library: IMBE only
     return lib, path
 
 
@@ -137,6 +144,14 @@ class AmbeDecoder:
     def decode_frame(self, ambe_fr: np.ndarray):
         ctypes.memmove(self._fr, bytes(np.ascontiguousarray(ambe_fr, dtype=np.uint8).ravel()), 96)
         rc = self.lib.mbe_processAmbe3600x2450Frame(
+            self._out, ctypes.byref(self._res), ctypes.byref(self._fr), self._d,
+            self._cur, self._prev, self._prev_enh)
+        return self._result(rc)
+
+    def decode_dstar(self, ambe_fr: np.ndarray):
+        """D-STAR AMBE 3600x2400 frame (4x24 bitplanes, mbelib does the FEC)."""
+        ctypes.memmove(self._fr, bytes(np.ascontiguousarray(ambe_fr, dtype=np.uint8).ravel()), 96)
+        rc = self.lib.mbe_processAmbe3600x2400Frame(
             self._out, ctypes.byref(self._res), ctypes.byref(self._fr), self._d,
             self._cur, self._prev, self._prev_enh)
         return self._result(rc)

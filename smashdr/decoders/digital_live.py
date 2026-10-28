@@ -16,7 +16,7 @@ known and says the call is clear; encrypted / unknown calls show metadata only.
 import numpy as np
 
 from smashdr.core.dsp import Channelizer
-from smashdr.decoders import dmr, ysf
+from smashdr.decoders import dmr, dstar, ysf
 from smashdr.decoders.p25 import C4FMDemod, CHAN_RATE
 from smashdr.decoders.p25_live import Upsample6
 
@@ -313,4 +313,151 @@ class DmrLive(_LiveBase):
         if len(self.done) > 500:
             self.done = {j for j in self.done if j > st.end - 4000}
         st.trim(min([st.end - 600] + [j - 70 for j, *_ in self.pending]))
+        return self._finish(pcm, events)
+
+
+# --------------------------------------------------------------------------
+class DstarLive(_LiveBase):
+    """D-STAR (GMSK): radio header, voice superframes, slow-data header / message.
+    The C4FM front end works for GMSK too (2 levels instead of 4: sign = bit)."""
+
+    def __init__(self, rate, offset_hz, decoder=None):
+        super().__init__(rate, offset_hz, decoder)
+        sym = lambda s: dstar.bits_of(s).astype(np.float32) * 2 - 1
+        self.pats = {"v": sym(dstar.VOICE_SYNC),
+                     "h": sym("1010101010101010" + dstar.FRAME_SYNC),
+                     "e": sym("1010101010101010" + dstar.EOT)}
+        self.call = None
+        self.pending = []                 # (kind, abs pos, gain, offset, extra)
+        self.done = set()
+        self.next_sync = None             # expected next voice sync (abs index)
+        self.misses = 0
+        self.slow = dstar.SlowData()
+        self.sf = {}                      # sync index -> {k: 3 slow bytes}
+
+    def _snap(self, kind):
+        c = self.call
+        return {"type": kind, "proto": "DSTAR", "my": c["my"], "sfx": c["sfx"], "ur": c["ur"],
+                "rpt1": c["rpt1"], "rpt2": c["rpt2"], "msg": c["msg"], "src": c["my"] or None,
+                "encrypted": False, "duration": c["last"] - c["start"]}
+
+    def _start(self, t, events):
+        if self.call is None:
+            self.call = {"start": t, "last": t, "my": "", "sfx": "", "ur": "", "rpt1": "",
+                         "rpt2": "", "msg": ""}
+            self.slow = dstar.SlowData()
+            if self.dec is not None:
+                self.dec.reset()
+            events.append(self._snap("start"))
+
+    def _end(self, events):
+        if self.call is not None:
+            events.append(self._snap("end"))
+        self.call = None
+        self.next_sync = None
+        self.misses = 0
+
+    def _info(self, h, events):
+        c = self.call
+        before = (c["my"], c["sfx"], c["ur"], c["rpt1"], c["rpt2"], c["msg"])
+        for k in ("my", "sfx", "ur", "rpt1", "rpt2"):
+            if k in h and h[k] is not None:
+                c[k] = h[k]
+        if "msg" in h:
+            c["msg"] = h["msg"]
+        if (c["my"], c["sfx"], c["ur"], c["rpt1"], c["rpt2"], c["msg"]) != before:
+            events.append(self._snap("update"))
+
+    def _sync(self, i, g, o, t, events):
+        self._start(t, events)
+        self.call["last"] = t + 0.42
+        self.next_sync = i + dstar.SUPERFRAME
+        self.misses = 0
+        self.sf[i] = {}
+        for k in range(21):                           # voice of frames 1..20 + next frame 0
+            j = i + 24 + 96 * k
+            if j not in self.done:
+                self.done.add(j)
+                self.pending.append(("voice", j, g, o, None))
+            if 1 <= k <= 20:
+                self.pending.append(("slow", i + 96 * k, g, o, (i, k)))
+
+    def process(self, iq):
+        st = self.st
+        st.push(iq)
+        events, pcm = [], []
+        for i, kind in st.find(self.pats, 24, thr=0.85):
+            t = self.t(i)
+            g, o = st.fit(i, self.pats[kind])
+            if kind == "v":
+                if self.next_sync is not None and abs(i - self.next_sync) <= 4:
+                    i = self.next_sync if abs(i - self.next_sync) > 1 else i
+                self._sync(i, g, o, t, events)
+            elif kind == "h":
+                self.pending.append(("header", i + len(self.pats["h"]), g, o, None))
+            elif kind == "e" and self.call is not None:
+                self._end(events)
+        # a missed voice sync: carry on where it should have been
+        if (self.call is not None and self.next_sync is not None
+                and st.searched > self.next_sync + 30):
+            self.misses += 1
+            if self.misses > 3:
+                self._end(events)
+            else:
+                ns = self.next_sync
+                prev = [p for p in self.pending if p[0] == "voice"]
+                g, o = (prev[-1][2], prev[-1][3]) if prev else (1.0, 0.0)
+                m = self.misses
+                self._sync(ns, g, o, self.t(ns), events)
+                self.misses = m
+        keep = []
+        for kind, j, g, o, extra in self.pending:
+            n = {"voice": 72, "slow": 24, "header": dstar.HEADER_BITS}[kind]
+            if j + n > st.end:
+                keep.append((kind, j, g, o, extra))
+                continue
+            if j < st.base:
+                continue
+            bits = ((st.seg(j, j + n) - o) / g > 0).astype(np.uint8)
+            if kind == "voice":
+                if self.call is not None and self.dec is not None:
+                    a, _r = self.dec.decode_dstar(dstar.ambe_frame(bits))
+                    pcm.append(a)
+            elif kind == "slow":
+                i0, k = extra
+                sf = self.sf.setdefault(i0, {})
+                sf[k] = dstar.slow_bytes(bits)
+                if len(sf) == 20:
+                    info = self.slow.feed_superframe(b"".join(sf[x] for x in range(1, 21)))
+                    del self.sf[i0]
+                    if self.call is not None:
+                        if "header" in info:
+                            self._info(info["header"], events)
+                        if "message" in info:
+                            self._info({"msg": info["message"]}, events)
+            elif kind == "header":
+                h = dstar.decode_header(bits)
+                if h:
+                    self._end(events)                 # a header always starts a new call
+                    self._start(self.t(j), events)
+                    self.call["last"] = self.t(j) + 0.5
+                    self.next_sync = None
+                    self._info(h, events)
+                    # voice frames follow the header directly; frame 0's sync comes 2016 bits on
+                    start = j + dstar.HEADER_BITS
+                    for k in range(21):
+                        p = start + 96 * k
+                        if p not in self.done:
+                            self.done.add(p)
+                            keep.append(("voice", p, g, o, None))
+        self.pending = keep
+        if len(self.sf) > 4:
+            for k in sorted(self.sf)[:-4]:
+                del self.sf[k]
+        now = self.t(st.end)
+        if self.call is not None and now - self.call["last"] > END_TIMEOUT_S:
+            self._end(events)
+        if len(self.done) > 2000:
+            self.done = {j for j in self.done if j > st.end - 5000}
+        st.trim(min([st.end - 700] + [j - 40 for _k, j, *_r in self.pending]))
         return self._finish(pcm, events)

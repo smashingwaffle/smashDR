@@ -27,8 +27,9 @@ MODES = {
     "P25": {"half_bw": 6_250.0, "chan_rate": 48_000},
     "DMR": {"half_bw": 6_250.0, "chan_rate": 48_000},
     "YSF": {"half_bw": 6_250.0, "chan_rate": 48_000},      # Yaesu System Fusion
+    "DSTAR": {"half_bw": 6_250.0, "chan_rate": 48_000},    # Icom D-STAR (GMSK)
 }
-DIGITAL_MODES = {"P25", "DMR", "YSF"}
+DIGITAL_MODES = {"P25", "DMR", "YSF", "DSTAR"}
 
 
 # --------------------------------------------------------------------------

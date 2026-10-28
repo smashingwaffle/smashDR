@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.7.3"
+VERSION = "0.7.4"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -136,7 +136,7 @@ from smashdr.ui.presets import PresetsWindow, load_presets  # noqa: E402
 from smashdr.ui.aircraft import AircraftTab  # noqa: E402  (before QApplication: WebEngine)
 from smashdr.decoders.p25_live import P25Live  # noqa: E402
 from smashdr.decoders.p25_trunk import P25Trunk  # noqa: E402
-from smashdr.decoders.digital_live import DmrLive, YsfLive  # noqa: E402
+from smashdr.decoders.digital_live import DmrLive, DstarLive, YsfLive  # noqa: E402
 from smashdr.decoders import p25 as p25mod  # noqa: E402
 
 try:
@@ -340,7 +340,7 @@ class SdrReader(QtCore.QThread):
                     self.p25 = P25Trunk(rate, off, float(self.sdr.center_freq),
                                         lambda: self._vocoder("P25"))
                 else:
-                    live = {"DMR": DmrLive, "YSF": YsfLive}[self.mode]
+                    live = {"DMR": DmrLive, "YSF": YsfLive, "DSTAR": DstarLive}[self.mode]
                     self.p25 = live(rate, off, self._vocoder(self.mode))
             except ValueError as e:
                 self.p25 = None
@@ -1405,6 +1405,8 @@ class MainWindow(QtWidgets.QMainWindow):
         who = []
         if r.get("proto") == "YSF":
             who.append(f"{r.get('src') or '?'} (Fusion)")
+        elif r.get("proto") == "DSTAR":
+            who.append(f"{r.get('my') or '?'} (D-STAR)")
         else:
             if r.get("tgid") is not None:
                 who.append(f"TG {r['tgid']}")
@@ -1524,7 +1526,19 @@ class MainWindow(QtWidgets.QMainWindow):
         tg = ev.get("tgid")
         src = ev.get("src")
         parts = []
-        if proto == "YSF":
+        if proto == "DSTAR":
+            me = html.escape(ev.get("my") or "?") + (f"/{html.escape(ev['sfx'])}" if ev.get("sfx") else "")
+            who = f"<b>{me}</b>"
+            if ev.get("ur"):
+                who += f" → {html.escape(ev['ur'])}"
+            parts.append(who)
+            if ev.get("rpt1"):
+                parts.append(f"via {html.escape(ev['rpt1'])}")
+            if ev.get("msg"):
+                parts.append(f"“{html.escape(ev['msg'])}”")
+            parts.append("D-STAR")
+            src = None
+        elif proto == "YSF":
             who = f"<b>{html.escape(src or '?')}</b>"
             if ev.get("dst"):
                 who += f" → {html.escape(ev['dst'])}"
@@ -1645,7 +1659,8 @@ class MainWindow(QtWidgets.QMainWindow):
         digital = (p.get("digital") or "").upper()
         want = ("P25" if digital.startswith("P25") else
                 "DMR" if digital.startswith("DMR") or "MOTOTRBO" in digital else
-                "YSF" if any(k in digital for k in ("YSF", "FUSION", "C4FM")) else None)
+                "YSF" if any(k in digital for k in ("YSF", "FUSION", "C4FM")) else
+                "DSTAR" if digital.replace("-", "").startswith("DSTAR") else None)
         if want and self.mode != want:
             self._set_mode(want)
         self._tune(p["freq_hz"], apply_band_defaults=False)
