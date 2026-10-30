@@ -153,6 +153,11 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   baro / 5,0 track, GS, TAS, roll / 6,0 magnetic heading, IAS, Mach (pyModeS
   rules + check vs ADS-B track; ambiguous -> dropped) -> p['ehs'] (+ t_<bds>).
   Shown in the card ('Radar data') and as 'alt ➜ selected' in the Alt column.
+- ISS tab: `core/satellites.py` (vendored pure-Python SGP4 in smashdr/thirdparty/sgp4,
+  MIT; TEME->ECEF via GMST; look angles, Doppler, sunlit/visible, passes 48 h; TLE from
+  CelesTrak cached 12 h in user/cache/tle.json) + `ui/satellites.py` SatTab (Leaflet map
+  with track/footprint, pass table, SkyPlot polar plot, ntfy alert before good passes,
+  'Tune receiver' + optional Doppler follow -> MainWindow._sat_tune).
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
   Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,

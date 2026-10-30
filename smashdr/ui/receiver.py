@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.7.7"
+VERSION = "0.8.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -726,6 +726,10 @@ class MainWindow(QtWidgets.QMainWindow):
                                         int(opts.get("_opened_device", opts["device_index"])))
         tabs.addTab(self.aircraft_tab, "Aircraft")
         self.aircraft_tab.emergency.connect(self._aircraft_emergency)
+        from smashdr.ui.satellites import SatTab
+        self.sat_tab = SatTab(opts)
+        self.sat_tab.tune_request.connect(self._sat_tune)
+        tabs.addTab(self.sat_tab, "ISS")
         tabs.addTab(self._build_settings_tab(), "Settings")
         tabs.setCurrentIndex(min(max(int(opts.get("tab", 0)), 0), tabs.count() - 1))
         # save settings every 30 s too, so a crash or power cut doesn't lose them
@@ -1418,6 +1422,12 @@ class MainWindow(QtWidgets.QMainWindow):
     # ======================================================================
     # P25 call readout
     # ======================================================================
+    def _sat_tune(self, hz):
+        """ISS tab: tune to a downlink (Doppler-corrected while the satellite is up)."""
+        if self.mode != "NFM":
+            self._set_mode("NFM")
+        self._tune(hz, apply_band_defaults=False)
+
     def _aircraft_emergency(self, text):
         """Flash the Aircraft tab while any plane has a confirmed emergency squawk."""
         i = self.tabs.indexOf(self.aircraft_tab)
@@ -2012,6 +2022,7 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.opts["presets_open"] = False
         self.aircraft_tab.collect()
+        self.sat_tab.collect()
         self.opts.update(
             tab=self.tabs.currentIndex(),
             split_tx=self.tx_split.sizes(),
