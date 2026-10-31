@@ -1955,6 +1955,358 @@
       "step_hz": 5000,
       "digital": "DSTAR",
       "note": "D-STAR, PAPA, Santiago Peak (D3) · module C, gateway KI6MGN G · heard by Stefaan 2026-10-27"
+    },
+    {
+      "name": "S 146.535",
+      "freq_hz": 146535000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 146.550",
+      "freq_hz": 146550000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 146.580",
+      "freq_hz": 146580000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 146.595",
+      "freq_hz": 146595000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "T-HUNT",
+      "freq_hz": 146565000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "Transmitter hunts · TASMA"
+    },
+    {
+      "name": "ATV voice",
+      "freq_hz": 146430000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "ATV FM simplex (talkback) · TASMA"
+    },
+    {
+      "name": "S 145.510",
+      "freq_hz": 145510000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.525",
+      "freq_hz": 145525000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.540",
+      "freq_hz": 145540000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.555",
+      "freq_hz": 145555000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.570",
+      "freq_hz": 145570000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.585",
+      "freq_hz": 145585000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.600",
+      "freq_hz": 145600000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.615",
+      "freq_hz": 145615000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.630",
+      "freq_hz": 145630000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.645",
+      "freq_hz": 145645000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 145.660",
+      "freq_hz": 145660000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex, 15 kHz · TASMA"
+    },
+    {
+      "name": "S 147.510",
+      "freq_hz": 147510000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "FM simplex · TASMA"
+    },
+    {
+      "name": "ISS APRS",
+      "freq_hz": 145825000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "ISS APRS digipeater (Doppler ±3.5 kHz) · use the ISS tab"
+    },
+    {
+      "name": "70 446.500",
+      "freq_hz": 446500000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "Simplex voice, ground/mobile only, no digital · SCRRBA"
+    },
+    {
+      "name": "70 CALL",
+      "freq_hz": 446520000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "Simplex voice (70 cm calling) · SCRRBA"
+    },
+    {
+      "name": "70 445.000",
+      "freq_hz": 445000000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "Simplex low-level mobile / autopatch / IRLP / EchoLink, no digital · SCRRBA"
+    },
+    {
+      "name": "70 440.000",
+      "freq_hz": 440000000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "Simplex low-level mobile / autopatch / IRLP / EchoLink, no digital · SCRRBA"
+    },
+    {
+      "name": "Intercom",
+      "freq_hz": 449460000,
+      "mode": "NFM",
+      "group": "Ham simplex (LA)",
+      "step_hz": 5000,
+      "note": "Simplex remote intercommunications channel · SCRRBA"
+    },
+    {
+      "name": "Open 445.200",
+      "freq_hz": 445200000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.200"
+    },
+    {
+      "name": "Open 445.520",
+      "freq_hz": 445520000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.520"
+    },
+    {
+      "name": "Open 445.560",
+      "freq_hz": 445560000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.560"
+    },
+    {
+      "name": "Open 445.580",
+      "freq_hz": 445580000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.580"
+    },
+    {
+      "name": "Open 445.600",
+      "freq_hz": 445600000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.600"
+    },
+    {
+      "name": "Open 445.620",
+      "freq_hz": 445620000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.620"
+    },
+    {
+      "name": "Open 445.640",
+      "freq_hz": 445640000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.640"
+    },
+    {
+      "name": "Open 445.660",
+      "freq_hz": 445660000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.660"
+    },
+    {
+      "name": "Open 445.680",
+      "freq_hz": 445680000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.680"
+    },
+    {
+      "name": "Open 445.900",
+      "freq_hz": 445900000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.900"
+    },
+    {
+      "name": "Open 445.920",
+      "freq_hz": 445920000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 440.920"
+    },
+    {
+      "name": "Open 446.400",
+      "freq_hz": 446400000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 441.400"
+    },
+    {
+      "name": "Open 447.000",
+      "freq_hz": 447000000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 442.000"
+    },
+    {
+      "name": "Open 447.020",
+      "freq_hz": 447020000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 442.020"
+    },
+    {
+      "name": "Open 447.200",
+      "freq_hz": 447200000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 442.200"
+    },
+    {
+      "name": "Open 447.320",
+      "freq_hz": 447320000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 442.320"
+    },
+    {
+      "name": "Open 447.580",
+      "freq_hz": 447580000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 442.580"
+    },
+    {
+      "name": "Open 449.200",
+      "freq_hz": 449200000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 444.200"
+    },
+    {
+      "name": "Open 449.300",
+      "freq_hz": 449300000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 444.300"
+    },
+    {
+      "name": "Open 449.500",
+      "freq_hz": 449500000,
+      "mode": "NFM",
+      "group": "70cm open repeaters",
+      "step_hz": 5000,
+      "note": "SCRRBA public open repeater output (shared, uncoordinated), input 444.500"
     }
   ],
   "collapsed": [
