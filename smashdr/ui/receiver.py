@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.8.1"
+VERSION = "0.8.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -638,8 +638,9 @@ class PlanStrip(pg.PlotWidget):
             if a <= x < b:
                 kind = self.cats.get(cat, ["", cat])[1]
                 return (f"<b>{a / 1e6:.3f}–{b / 1e6:.3f} MHz · {html.escape(kind)}</b><br>"
-                        f"{html.escape(tip)}<br><span style='color:gray'>LA band plan: TASMA (2 m), "
-                        f"SCRRBA (70 cm), simplified</span>")
+                        f"{html.escape(tip)}<br><span style='color:gray'>"
+                        + ("SoCal: 50 W PEP max 420-450 MHz (FCC 97.313(f)). " if 420e6 <= a < 450e6 else "")
+                        + "LA band plan: TASMA (2 m), SCRRBA (70 cm), simplified</span>")
         return None
 
     def mouseMoveEvent(self, ev):
