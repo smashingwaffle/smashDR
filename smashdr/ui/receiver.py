@@ -36,10 +36,10 @@ from smashdr.core import codes, flightaware, notify, places, transcribe
 from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
-from smashdr.paths import RECORDINGS, ROOT, USER  # noqa: E402
+from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.8.0"
+VERSION = "0.8.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -545,6 +545,113 @@ class BandStrip(pg.PlotWidget):
                 self._items.append(t)
 
 
+class PlanStrip(pg.PlotWidget):
+    """Second band strip: the local (LA) ham band plan for 2 m / 70 cm, from
+    data/bandplan_la.json. Hidden when the span has no planned band in it.
+    Labels appear where they fit; hover = what the segment is for."""
+
+    def __init__(self, on_wheel):
+        super().__init__(viewBox=TuneViewBox(on_wheel))
+        self.setFixedHeight(22)
+        self.hideAxis("left")
+        self.hideAxis("bottom")
+        self.setYRange(0, 1, padding=0)
+        self.setMouseEnabled(x=False, y=False)
+        self.plotItem.vb.disableAutoRange()
+        self.setMouseTracking(True)
+        self._items, self._span = [], None
+        self._font = QtGui.QFont("Segoe UI", 8)
+        try:
+            d = json.loads((DATA / "bandplan_la.json").read_text(encoding="utf-8"))
+            self.cats = d["categories"]
+            self.segs = [(a * 1e6, b * 1e6, c, lab, tip) for a, b, c, lab, tip in d["segments"]]
+            self.points = [(f * 1e6, c, lab, tip) for f, c, lab, tip in d["points"]]
+            self.source = d.get("note", "")
+        except (OSError, ValueError, KeyError) as e:
+            print(f"[!] data/bandplan_la.json: {e}")
+            self.cats, self.segs, self.points, self.source = {}, [], [], ""
+
+    def covers(self, lo_hz, hi_hz):
+        return any(a < hi_hz and b > lo_hz for a, b, *_r in self.segs)
+
+    def set_span(self, lo_hz, hi_hz):
+        self._span = (lo_hz, hi_hz)
+        self.setVisible(self.covers(lo_hz, hi_hz))
+        self.redraw()
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        if hasattr(self, "_items"):
+            self.redraw()
+
+    def redraw(self):
+        if not hasattr(self, "_items"):
+            return
+        for it in self._items:
+            self.removeItem(it)
+        self._items = []
+        if not self._span or not self.isVisible():
+            return
+        (vlo, vhi), _ = self.plotItem.vb.viewRange()
+        lo, hi = max(vlo * 1e6, self._span[0]), min(vhi * 1e6, self._span[1])
+        if hi <= lo:
+            return
+        px_per_hz = max(1.0, self.plotItem.vb.width()) / ((vhi - vlo) * 1e6)
+        fm = QtGui.QFontMetrics(self._font)
+        for a, b, cat, lab, _tip in self.segs:
+            if b <= lo or a >= hi:
+                continue
+            col = QtGui.QColor(self.cats.get(cat, ["#546e7a"])[0])
+            rect = QtWidgets.QGraphicsRectItem(a / 1e6, 0.1, (b - a) / 1e6, 0.8)
+            fill = QtGui.QColor(col)
+            fill.setAlpha(150)
+            rect.setBrush(pg.mkBrush(fill))
+            rect.setPen(pg.mkPen(QtGui.QColor(20, 20, 20), width=1))
+            self.addItem(rect)
+            self._items.append(rect)
+            vis_a, vis_b = max(a, lo), min(b, hi)
+            if (vis_b - vis_a) * px_per_hz > fm.horizontalAdvance(lab) + 8:
+                t = pg.TextItem(lab, color=(255, 255, 255), anchor=(0.5, 0.5))
+                t.setFont(self._font)
+                t.setPos((vis_a + vis_b) / 2e6, 0.5)
+                self.addItem(t)
+                self._items.append(t)
+        for f, cat, lab, _tip in self.points:
+            if lo < f < hi:
+                ln = QtWidgets.QGraphicsLineItem(f / 1e6, 0.0, f / 1e6, 1.0)
+                ln.setPen(pg.mkPen("#ffffff", width=1, style=QtCore.Qt.PenStyle.DotLine))
+                self.addItem(ln)
+                self._items.append(ln)
+
+    def _at(self, pos):
+        vb = self.plotItem.vb
+        sp = self.mapToScene(QtCore.QPoint(int(pos.x()), int(pos.y())))
+        if not vb.sceneBoundingRect().contains(sp):
+            return None
+        (vlo, vhi), _ = vb.viewRange()
+        x = vb.mapSceneToView(sp).x() * 1e6
+        tol = 4 * (vhi - vlo) * 1e6 / max(1.0, vb.width())
+        for f, cat, lab, tip in self.points:
+            if abs(x - f) <= tol:
+                return f"<b>{f / 1e6:.3f} MHz · {html.escape(lab)}</b><br>{html.escape(tip)}"
+        for a, b, cat, lab, tip in self.segs:
+            if a <= x < b:
+                kind = self.cats.get(cat, ["", cat])[1]
+                return (f"<b>{a / 1e6:.3f}–{b / 1e6:.3f} MHz · {html.escape(kind)}</b><br>"
+                        f"{html.escape(tip)}<br><span style='color:gray'>LA band plan: TASMA (2 m), "
+                        f"SCRRBA (70 cm), simplified</span>")
+        return None
+
+    def mouseMoveEvent(self, ev):
+        super().mouseMoveEvent(ev)
+        tip = self._at(ev.position())
+        if tip:
+            QtWidgets.QToolTip.showText(QtGui.QCursor.pos(),
+                                        f"<p style='white-space:pre-wrap; max-width:420px'>{tip}</p>", self)
+        else:
+            QtWidgets.QToolTip.hideText()
+
+
 class TagStrip(pg.PlotWidget):
     """Preset names under the waterfall, written horizontally (x in MHz).
     Overlapping names go to a second / third row; hover = tooltip, click = tune."""
@@ -874,6 +981,10 @@ class MainWindow(QtWidgets.QMainWindow):
             lambda: self._tune(self.marker.value() * 1e6, snap=True))
         self.spec_plot.addItem(self.marker)
         self.band_strip.setXLink(self.spec_plot)
+        self.plan_strip = PlanStrip(self._wheel_tune)
+        self.plan_strip.setXLink(self.spec_plot)
+        self.plan_strip.hide()
+        self.spec_plot.getViewBox().sigXRangeChanged.connect(lambda *_a: self.plan_strip.redraw())
 
         self.wf_plot = pg.PlotWidget(viewBox=TuneViewBox(self._wheel_tune))
         self.wf_plot.setXLink(self.spec_plot)
@@ -899,7 +1010,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tag_strip = TagStrip(self._wheel_tune, self._tag_tooltip, self._tune_preset)
         self.wf_plot.getViewBox().sigXRangeChanged.connect(
             lambda _vb, r: self.tag_strip.set_view(*r))
-        for p in (self.band_strip, self.spec_plot, self.wf_plot):
+        for p in (self.band_strip, self.plan_strip, self.spec_plot, self.wf_plot):
             p.scene().sigMouseClicked.connect(
                 lambda ev, plot=p: self._plot_clicked(ev, plot))
 
@@ -912,6 +1023,7 @@ class MainWindow(QtWidgets.QMainWindow):
         pl.setContentsMargins(0, 0, 0, 0)
         pl.setSpacing(0)
         pl.addWidget(self.band_strip)
+        pl.addWidget(self.plan_strip)
         pl.addWidget(self.spec_plot, 1)
 
         split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
@@ -1963,6 +2075,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:                                     # keep the zoom, centred on the channel
                 self._set_view(self.target_hz / 1e6 - self._zoom_w / 2, self._zoom_w)
             self.band_strip.redraw(center - rate / 2, center + rate / 2)
+            self.plan_strip.set_span(center - rate / 2, center + rate / 2)
             self._draw_preset_tags()
 
         alpha = AVERAGING.get(self.avg_box.currentText(), 0.35)

@@ -50,6 +50,8 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   decimator), Demod (NFM/AM/WFM -> 48 kHz, gate, limiter, click-free switches)
 - `ui/widgets.py` FreqDisplay (VFO) and LevelMeter
 - `core/bandplan.py` simplified US band plan, lookup() and in_span()
+- `data/bandplan_la.json` + receiver.PlanStrip: second strip under the band bar with the
+  LA ham plan (2 m TASMA rev 2015, 70 cm SCRRBA), shown only when the span covers it.
 - `ui/presets.py` preset store + PresetsWindow (second-screen window: group
   sidebar, group colours, Pinned section, live marker)
 - Stefaan is in LA (90032); presets and examples should be LA-area, Mt Wilson
