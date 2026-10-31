@@ -1,5 +1,5 @@
 {
- "note": "Southern California / Los Angeles ham band plans shown in the second strip under the band bar. 2 m: TASMA band plan rev. 2/7/2015 (tasma.org). 70 cm: SCRRBA 420-440 MHz plan updated 9/2024 (from the PDF) and SCRRBA 440-450 plan (2005, via edsradio.com). 50 W PEP max 420-450 MHz in Southern California (FCC 97.313(f)). Simplified: check the originals before transmitting.",
+ "note": "Southern California / Los Angeles ham band plans shown in the second strip under the band bar. 2 m: TASMA band plan rev. 2/7/2015 (PDF from tasma.org, Stefaan's copy). 70 cm: SCRRBA 420-440 MHz plan updated 9/2024 (from the PDF) and SCRRBA 440-450 plan (2005, via edsradio.com). 50 W PEP max 420-450 MHz in Southern California (FCC 97.313(f)). Simplified: check the originals before transmitting.",
  "categories": {
   "weak": [
    "#8d6e63",
@@ -80,7 +80,7 @@
    144.9,
    "rpt_in",
    "Rpt inputs",
-   "Repeater inputs, 20 kHz steps (outputs 145.120-145.480)"
+   "Repeater inputs 144.520-144.880, 20 kHz; 'low in, high out', output = input + 600 kHz (145.120-145.480). Band-edge pairs 145.105/144.505 and 145.495/144.895"
   ],
   [
    144.9,
@@ -94,7 +94,7 @@
    145.015,
    "dstar",
    "D-STAR in",
-   "D-STAR repeater inputs, 10 kHz steps"
+   "D-STAR repeater inputs, 10 kHz: 144.985/.995/145.005/.015, paired with outputs 147.540-147.570 (wide split)"
   ],
   [
    145.015,
@@ -108,7 +108,7 @@
    145.5,
    "rpt_out",
    "Rpt outputs",
-   "Repeater outputs 145.120-145.480, 20 kHz steps (inputs 144.520-144.880)"
+   "Repeater outputs 145.120-145.480 (input = output - 600 kHz); 144.74/145.34 and 144.86/145.46 shared with Mexico"
   ],
   [
    145.5,
@@ -122,7 +122,7 @@
    145.8,
    "links",
    "Aux / links",
-   "Fixed simplex auxiliary stations: internet links, remote bases"
+   "Fixed simplex auxiliary stations (internet links, simplex autopatch): 145.675-145.785 every 15 kHz, + 146.460 and 147.480. CTCSS/DCS mandatory, no continuous linking"
   ],
   [
    145.8,
@@ -136,7 +136,7 @@
    146.4,
    "rpt",
    "Repeaters",
-   "Repeater inputs/outputs, inverted 15 kHz sub-band"
+   "Repeaters, inverted 15 kHz pairs (input/output alternate, 600 kHz split): 146.010/146.610, 146.625/146.025 \u2026 53 pairs over 146-148 MHz"
   ],
   [
    146.4,
@@ -150,14 +150,14 @@
    146.6,
    "simplex",
    "FM simplex",
-   "146.520 national calling frequency, simplex 146.535-146.595"
+   "146.520 national calling frequency; simplex 146.535-146.595 (146.565 = T-hunts)"
   ],
   [
    146.6,
    147.4,
    "rpt",
    "Repeaters",
-   "Repeater inputs/outputs, inverted 15 kHz sub-band"
+   "Repeaters, inverted 15 kHz pairs (600 kHz split); 146.22/82, 146.31/91, 146.37/97 shared with Mexico"
   ],
   [
    147.4,
@@ -171,7 +171,7 @@
    147.58,
    "dstar",
    "D-STAR out",
-   "D-STAR repeater outputs 147.540-147.570, 10 kHz steps"
+   "D-STAR repeater outputs 147.540/.550/.560/.570, inputs 144.985-145.015"
   ],
   [
    147.58,
@@ -185,7 +185,7 @@
    148.0,
    "rpt",
    "Repeaters",
-   "Repeater inputs/outputs, inverted 15 kHz sub-band"
+   "Repeaters, inverted 15 kHz pairs (600 kHz split, 147.6-148 inputs above outputs); 147.93/33 shared with Mexico"
   ],
   [
    420.0,
@@ -321,16 +321,40 @@
    "APRS (packet, 1200 baud)"
   ],
   [
+   144.91,
+   "misc",
+   "Xband",
+   "144.910 cross-band repeater in/out (CTCSS/DCS mandatory)"
+  ],
+  [
    145.825,
    "sat",
    "ISS APRS",
    "ISS APRS digipeater"
   ],
   [
+   146.43,
+   "simplex",
+   "ATV voice",
+   "146.430 ATV FM simplex (talkback)"
+  ],
+  [
    146.52,
    "simplex",
    "146.52",
    "National FM simplex calling frequency"
+  ],
+  [
+   146.565,
+   "simplex",
+   "T-hunt",
+   "146.565 transmitter hunts"
+  ],
+  [
+   147.525,
+   "misc",
+   "Xband",
+   "147.525 cross-band repeater in/out (CTCSS/DCS mandatory)"
   ],
   [
    432.1,
