@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.8.5"
+VERSION = "0.8.6"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -872,7 +872,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # --- row 1: VFO, band label, modes ---
         self.vfo = FreqDisplay(self.target_hz)
         self.vfo.step_hz = self.step_hz
-        self.vfo.changed.connect(lambda hz: self._tune(hz))
+        self.vfo.changed.connect(lambda hz: self._tune(hz, follow=True))
         mhz = QtWidgets.QLabel("MHz")
         self.band_lbl = QtWidgets.QLabel("")
         f = self.band_lbl.font()
@@ -1264,6 +1264,12 @@ class MainWindow(QtWidgets.QMainWindow):
         df.addRow("Palette", self.pal_box)
         df.addRow("Spectrum averaging", self.avg_box)
         df.addRow("Preset tags", self.tags_chk)
+        self.follow_chk = QtWidgets.QCheckBox("Spectrum scrolls with the frequency (mouse wheel / dial)")
+        self.follow_chk.setToolTip("On: scrolling keeps your channel in place and the spectrum moves under it.\n"
+                                   "Off: the marker moves and the span only jumps near the edge.\n"
+                                   "Clicking a signal never moves the span.")
+        self.follow_chk.setChecked(bool(opts.get("follow_freq", True)))
+        df.addRow("Tuning", self.follow_chk)
 
         # --- Recording ---
         self.rec_dir_edit = QtWidgets.QLineEdit(opts["rec_dir"] or str(RECORDINGS))
@@ -1455,9 +1461,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _wheel_tune(self, direction: int):
         base = round(self.target_hz / self.step_hz) * self.step_hz
-        self._tune(base + direction * self.step_hz)
+        self._tune(base + direction * self.step_hz, follow=True)
 
-    def _tune(self, hz, snap=False, apply_band_defaults=True):
+    def _tune(self, hz, snap=False, apply_band_defaults=True, follow=False):
         hz = float(hz)
         if snap:
             hz = round(hz / self.step_hz) * self.step_hz
@@ -1498,6 +1504,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.presets_win is not None:
             self.presets_win.set_active(hz, self.mode)
 
+        # scrolling (wheel / VFO): the span moves with the frequency, like a dial
+        if (follow and self.center_hz is not None and self.follow_chk.isChecked()
+                and not self.rec_btn.isChecked()):
+            want = hz + self._offset_hz()
+            if abs(want - self.center_hz) >= 1000:
+                self.reader.request(center=want)
+            return
         # re-centre the hardware if the channel would fall off the span
         if self.center_hz is not None and self.rate_hz:
             half = MODES[self.mode]["half_bw"]
@@ -2062,12 +2075,27 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def on_frame(self, spec, center, rate, stats):
         if center != self.center_hz or rate != self.rate_hz:
+            old_c, old_r = self.center_hz, self.rate_hz
             self.center_hz, self.rate_hz = center, rate
             bins = (np.arange(FFT_SIZE) - FFT_SIZE / 2) * (rate / FFT_SIZE)
             self.freqs_mhz = (center + bins) / 1e6
-            self.avg = spec.copy()
-            self.wf[:] = np.median(spec) - 10          # empty rows read as black
-            self._wf_lv = None
+            k = None
+            if old_c is not None and rate == old_r and abs(center - old_c) < 0.9 * rate:
+                k = int(round((center - old_c) / (rate / FFT_SIZE)))     # bins the span moved
+            if k is None:
+                self.avg = spec.copy()
+                self.wf[:] = np.median(spec) - 10      # empty rows read as black
+                self._wf_lv = None
+            elif k:                                    # slide history so it stays under its frequency
+                fill = float(np.median(spec)) - 10
+                self.wf = np.roll(self.wf, -k, axis=1)
+                self.avg = np.roll(self.avg, -k)
+                if k > 0:
+                    self.wf[:, -k:] = fill
+                    self.avg[-k:] = spec[-k:]
+                else:
+                    self.wf[:, :-k] = fill
+                    self.avg[:-k] = spec[:-k]
             f0 = self.freqs_mhz[0]
             span = rate / 1e6
             self._wf_rect = QtCore.QRectF(f0, 0, span, WF_ROWS)
@@ -2161,6 +2189,7 @@ class MainWindow(QtWidgets.QMainWindow):
             palette=self.pal_box.currentText(),
             averaging=self.avg_box.currentText(),
             preset_tags=self.tags_chk.isChecked(),
+            follow_freq=self.follow_chk.isChecked(),
             rec_dir=self.rec_dir_edit.text().strip(),
             stt_model=self.stt_box.currentData(),
             stt_on=self.stt_chk.isChecked(),
