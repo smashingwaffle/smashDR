@@ -1,5 +1,5 @@
 {
- "note": "Southern California / Los Angeles ham band plans shown in the second strip under the band bar. 2 m: TASMA band plan rev. 2/7/2015 (PDF from tasma.org, Stefaan's copy). 70 cm: SCRRBA 420-440 MHz plan updated 9/2024 (from the PDF) and SCRRBA 440-450 plan (2005, via edsradio.com). 50 W PEP max 420-450 MHz in Southern California (FCC 97.313(f)). Simplified: check the originals before transmitting.",
+ "note": "Southern California / Los Angeles ham band plans shown in the second strip under the band bar. 2 m: TASMA band plan rev. 2/7/2015 (PDF from tasma.org, Stefaan's copy). 70 cm: SCRRBA 420-440 MHz plan updated 9/2024 (from the PDF) and SCRRBA 440-450 plan (January 2016 PDF). 50 W PEP max 420-450 MHz in Southern California (FCC 97.313(f)). Simplified: check the originals before transmitting.",
  "categories": {
   "weak": [
    "#8d6e63",
@@ -296,15 +296,15 @@
    440.0,
    445.0,
    "rpt_in",
-   "Rpt inputs / simplex",
-   "Repeater inputs (+5 MHz = output), 20 kHz; 440.000 simplex autopatch, ground/mobile only, no digital (secondary crossband at special events); 441.500/.520 packet"
+   "Rpt inputs",
+   "Repeater inputs (output = input + 5 MHz), 20 kHz channels, 16 kHz max BW, FM only (16K0F3E). 440.000 simplex low-level mobile / autopatch / IRLP / EchoLink, no digital \u00b7 441.000 remote control only \u00b7 441.500, 441.520 simplex packet (16 kHz, no voice) \u00b7 441.860, 441.880 test pair inputs (no digital) \u00b7 444.4625 test pair input, digital only"
   ],
   [
    445.0,
    450.0,
    "rpt_out",
-   "Rpt outputs / simplex",
-   "Repeater outputs 445.020-449.980, 20 kHz, FM; 446.000/446.500/446.520 simplex"
+   "Rpt outputs",
+   "Repeater outputs 445.020-449.980. 445.000 simplex low-level mobile / autopatch / IRLP / EchoLink, no digital \u00b7 446.000, 446.500, 446.520 simplex voice, ground/mobile only, no digital \u00b7 446.860, 446.880 test pair outputs \u00b7 449.460 simplex remote intercom \u00b7 449.4625 test pair output, digital only. Public open repeater outputs: 445.200, 445.520, 445.560, 445.580, 445.600, 445.620, 445.640, 445.660, 445.680, 445.900, 445.920, 446.400, 447.000, 447.020, 447.200, 447.320, 447.580, 449.200, 449.300, 449.500, 449.700"
   ]
  ],
  "points": [
@@ -363,16 +363,58 @@
    "70 cm SSB calling frequency"
   ],
   [
+   440.0,
+   "simplex",
+   "440.000",
+   "Simplex: low-level mobile, autopatch, IRLP, EchoLink. No digital"
+  ],
+  [
+   441.0,
+   "links",
+   "Remote ctl",
+   "Remote control only, no voice or digital"
+  ],
+  [
+   441.5,
+   "digital",
+   "Packet",
+   "Simplex packet, 16 kHz, no voice (also 441.520)"
+  ],
+  [
+   445.0,
+   "simplex",
+   "445.000",
+   "Simplex: low-level mobile, autopatch, IRLP, EchoLink. No digital"
+  ],
+  [
    446.0,
    "simplex",
    "446.000",
-   "Simplex voice"
+   "Simplex voice, ground/mobile only, no digital"
+  ],
+  [
+   446.5,
+   "simplex",
+   "446.500",
+   "Simplex voice, ground/mobile only, no digital"
   ],
   [
    446.52,
    "simplex",
-   "446.52",
-   "Simplex voice (70 cm calling)"
+   "446.520",
+   "Simplex voice, ground/mobile only, no digital"
+  ],
+  [
+   449.46,
+   "links",
+   "Intercom",
+   "Simplex remote intercommunications channel"
+  ],
+  [
+   449.4625,
+   "digital",
+   "Dig test",
+   "Test pair output, digital only (input 444.4625)"
   ]
  ]
 }
