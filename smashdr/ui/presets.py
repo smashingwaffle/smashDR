@@ -244,6 +244,43 @@ def parse_radioreference(text: str, group: str = "Imported", group_by_tag: bool 
     return out, skipped
 
 
+_YAESU_DIRS = {"OFF", "+RPT", "-RPT", "SPLIT", "-/+"}
+_YAESU_MODES = {"FM": "NFM", "NFM": "NFM", "AM": "AM", "WFM": "WFM", "DN": "NFM", "VW": "NFM",
+                "DIGITAL": "NFM", "AMS": "NFM"}
+
+
+def parse_yaesu_csv(text: str, group: str = "Radio memories"):
+    """Yaesu ADMS / CHIRP-less clone CSV (FTM-150, FT5D, FTM-500 ...): no header,
+    'ch, RX MHz, TX MHz, offset, OFF/+RPT/-RPT/SPLIT, mode, name, tone mode, CTCSS,
+    DCS, ...'. Returns presets ([] if the text isn't in that format)."""
+    out = []
+    for r in csv.reader(io.StringIO(text)):
+        if len(r) < 8 or not r[1].strip():
+            continue
+        f = _freq_mhz(r[1])
+        if f is None or r[4].strip().upper() not in _YAESU_DIRS:
+            continue
+        mode_y = r[5].strip().upper()
+        name = re.split(r"[^\x20-\x7e]", r[6])[0].strip()      # radio pads names with junk bytes
+        freq_hz = int(round(f * 1e6))
+        notes = [f"radio memory {r[0].strip()}"]
+        tx = _freq_mhz(r[2])
+        if tx and abs(tx - f) > 1e-6:
+            notes.append(f"TX {tx:.4f} ({r[4].strip()} {abs(tx - f):.3f} MHz)")
+        tm = r[7].strip().upper()
+        if tm in ("TONE", "TSQL", "T-TSQL") and len(r) > 8 and r[8].strip():
+            notes.append(f"{tm.lower()} {r[8].strip()}")
+        elif tm.startswith("DCS") and len(r) > 9 and r[9].strip():
+            notes.append(f"DCS {r[9].strip()}")
+        p = {"name": (name or f"{f:.4f}")[:18], "freq_hz": freq_hz,
+             "mode": _YAESU_MODES.get(mode_y, "NFM"), "group": group,
+             "step_hz": _default_step(freq_hz, "NFM"), "note": " · ".join(notes)}
+        if mode_y in ("DN", "VW", "DIGITAL"):
+            p["digital"] = "YSF"
+        out.append(p)
+    return out
+
+
 def groups_in_order(presets: list, order: list = ()) -> list:
     """Groups in the saved order (empty groups included), then any others in the
     order their first preset appears."""
@@ -431,7 +468,7 @@ class ImportDialog(QtWidgets.QDialog):
 
     def __init__(self, groups: list, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Import from RadioReference")
+        self.setWindowTitle("Import presets")
         self.resize(720, 480)
         help_lbl = QtWidgets.QLabel(
             "On a RadioReference page, select the table rows you want (or the whole "
@@ -452,7 +489,10 @@ class ImportDialog(QtWidgets.QDialog):
         self.group.currentTextChanged.connect(self._update_preview)
         self.by_tag.toggled.connect(self._update_preview)
 
+        open_btn = QtWidgets.QPushButton("Open file… (RadioReference or Yaesu radio CSV)")
+        open_btn.clicked.connect(self._open_file)
         form = QtWidgets.QFormLayout()
+        form.addRow("", open_btn)
         form.addRow("Group", self.group)
         form.addRow("", self.by_tag)
         self.buttons = QtWidgets.QDialogButtonBox(
@@ -469,7 +509,28 @@ class ImportDialog(QtWidgets.QDialog):
         lay.addWidget(self.buttons)
         self._update_preview()
 
+    def _open_file(self):
+        path, _f = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open a radio or RadioReference CSV", "", "CSV / text (*.csv *.txt);;All files (*)")
+        if not path:
+            return
+        raw = open(path, "rb").read()
+        for enc in ("utf-8-sig", "cp1252", "latin-1"):
+            try:
+                text = raw.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        # radio clone files list every empty memory: keep only rows with a frequency
+        rows = [ln for ln in text.splitlines() if any(c.strip() for c in ln.split(",")[1:3])]
+        self.text.setPlainText("\n".join(rows))
+        if parse_yaesu_csv(self.text.toPlainText()) and self.group.currentText() == "Imported":
+            self.group.setCurrentText("Radio memories")
+
     def parsed(self):
+        ys = parse_yaesu_csv(self.text.toPlainText(), self.group.currentText().strip() or "Radio memories")
+        if ys:
+            return ys, []
         return parse_radioreference(self.text.toPlainText(),
                                     self.group.currentText().strip() or "Imported",
                                     self.by_tag.isChecked())
