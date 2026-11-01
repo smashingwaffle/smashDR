@@ -39,7 +39,7 @@ from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, p
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.8.7"
+VERSION = "0.8.8"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1264,8 +1264,8 @@ class MainWindow(QtWidgets.QMainWindow):
         df.addRow("Palette", self.pal_box)
         df.addRow("Spectrum averaging", self.avg_box)
         df.addRow("Preset tags", self.tags_chk)
-        self.follow_chk = QtWidgets.QCheckBox("Spectrum scrolls with the frequency (mouse wheel / dial)")
-        self.follow_chk.setToolTip("On: scrolling keeps your channel in place and the spectrum moves under it.\n"
+        self.follow_chk = QtWidgets.QCheckBox("Spectrum slides along when the frequency reaches the edge")
+        self.follow_chk.setToolTip("On: the marker moves while you scroll; at the left/right edge the spectrum slides along.\n"
                                    "Off: the marker moves and the span only jumps near the edge.\n"
                                    "Clicking a signal never moves the span.")
         self.follow_chk.setChecked(bool(opts.get("follow_freq", True)))
@@ -1504,12 +1504,24 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.presets_win is not None:
             self.presets_win.set_active(hz, self.mode)
 
-        # scrolling (wheel / VFO): the span moves with the frequency, like a dial
+        # scrolling (wheel / VFO): the marker moves freely; only when it reaches the left or
+        # right edge of what's on screen does the view (zoomed) or the span slide along
         if (follow and self.center_hz is not None and self.follow_chk.isChecked()
                 and not self.rec_btn.isChecked()):
-            want = hz + self._offset_hz()
-            if abs(want - self.center_hz) >= 1000:
-                self.reader.request(center=want)
+            (vlo, vhi), _ = self.spec_plot.getViewBox().viewRange()
+            margin = 0.06 * (vhi - vlo)
+            mhz = hz / 1e6
+            d = 0.0
+            if mhz > vhi - margin:
+                d = mhz - (vhi - margin)
+            elif mhz < vlo + margin:
+                d = mhz - (vlo + margin)
+            if d:
+                f0, span = self._full_span()
+                if self._zoom_w is not None and f0 <= vlo + d and vhi + d <= f0 + span:
+                    self._set_view(vlo + d, vhi - vlo)        # zoomed: pan inside the span
+                else:
+                    self.reader.request(center=self.center_hz + d * 1e6)   # slide the hardware
             return
         # re-centre the hardware if the channel would fall off the span
         if self.center_hz is not None and self.rate_hz:
@@ -2101,8 +2113,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self._wf_rect = QtCore.QRectF(f0, 0, span, WF_ROWS)
             if self._zoom_w is None:
                 self.spec_plot.setXRange(f0, f0 + span, padding=0)
-            else:                                     # keep the zoom, centred on the channel
-                self._set_view(self.target_hz / 1e6 - self._zoom_w / 2, self._zoom_w)
+            else:                                     # keep the zoom where it was (clamped to the span)
+                (vlo, _vhi), _ = self.spec_plot.getViewBox().viewRange()
+                if not (f0 <= self.target_hz / 1e6 <= f0 + span) or not (f0 <= vlo <= f0 + span):
+                    vlo = self.target_hz / 1e6 - self._zoom_w / 2
+                self._set_view(vlo, self._zoom_w)
             self.band_strip.redraw(center - rate / 2, center + rate / 2)
             self.plan_strip.set_span(center - rate / 2, center + rate / 2)
             self._draw_preset_tags()
