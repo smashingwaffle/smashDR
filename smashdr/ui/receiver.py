@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.8.9"
+VERSION = "0.8.10"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -951,7 +951,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.eq.enabled = bool(opts.get("eq_on", False))
         self.eq_btn = QtWidgets.QPushButton("EQ")
         self.eq_btn.setCheckable(True)
-        self.eq_btn.setToolTip("Audio equalizer")
+        self.eq_btn.setToolTip("Audio equalizer for analog voice (NFM / AM / WFM).\n"
+                                "Digital modes (P25, DMR, Fusion, D-STAR) play without it.")
         self.eq_btn.setFixedWidth(42)
         self.eq_btn.clicked.connect(self._open_eq)
         self._eq_panel = None
@@ -2034,7 +2035,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_audio(self, pcm: bytes):
         if self.audio_out and not self.mute_chk.isChecked():
-            self.audio_out.write(self.eq.process(pcm))
+            # EQ only on analog "phone" audio (NFM/AM/WFM); digital voice plays as decoded
+            self.audio_out.write(pcm if self.mode in DIGITAL_MODES else self.eq.process(pcm))
 
     def _eq_btn_state(self):
         on = self.eq.active()

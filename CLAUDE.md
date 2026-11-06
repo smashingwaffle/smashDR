@@ -110,7 +110,7 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   (the chat won't take .cu8; Stefaan shares recordings this way)
 - `core/eq.py` + `ui/eq_panel.py`: 6-band listening EQ (100 Hz-4 kHz, ±12 dB, presets) as a
   linear-phase 1023-tap FIR via FFT overlap-add in MainWindow._on_audio (flat = bypass);
-  EQ button next to Vol; opts eq_gains / eq_on. Transcription gets the un-EQ'd audio.
+  EQ button next to Vol; opts eq_gains / eq_on. Analog modes only (skipped in DIGITAL_MODES). Transcription gets the un-EQ'd audio.
 - `ui/audio.py` QtMultimedia output, converts to device's preferred format
 - `core/settings.py` user/settings.json store (not in git)
 - `core/transcribe.py` faster-whisper (small.en or large-v3-turbo via Settings, CPU int8, hotwords + junk filter; Stefaan has Iris Xe,
