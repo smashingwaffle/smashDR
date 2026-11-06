@@ -36,10 +36,11 @@ from smashdr.core import codes, flightaware, notify, places, transcribe
 from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import DIGITAL_MODES, FFT_SIZE, MODES, Demod, cu8_to_iq, power_spectrum_db
 
+from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.8.8"
+VERSION = "0.8.9"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -945,7 +946,17 @@ class MainWindow(QtWidgets.QMainWindow):
                   QtWidgets.QLabel("Squelch"), self.sq_slider, self.sq_val):
             row2.addWidget(w)
         row2.addWidget(self.meter, 1)
-        for w in (QtWidgets.QLabel("Vol"), self.vol_slider, self.mute_chk, self.rec_btn):
+        self.eq = Equalizer()
+        self.eq.set_gains(opts.get("eq_gains") or [0] * 6)
+        self.eq.enabled = bool(opts.get("eq_on", False))
+        self.eq_btn = QtWidgets.QPushButton("EQ")
+        self.eq_btn.setCheckable(True)
+        self.eq_btn.setToolTip("Audio equalizer")
+        self.eq_btn.setFixedWidth(42)
+        self.eq_btn.clicked.connect(self._open_eq)
+        self._eq_panel = None
+        self._eq_btn_state()
+        for w in (QtWidgets.QLabel("Vol"), self.vol_slider, self.eq_btn, self.mute_chk, self.rec_btn):
             row2.addWidget(w)
         # waterfall look, right here so you can watch it while adjusting
         self.wf_bright = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
@@ -2023,7 +2034,27 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_audio(self, pcm: bytes):
         if self.audio_out and not self.mute_chk.isChecked():
-            self.audio_out.write(pcm)
+            self.audio_out.write(self.eq.process(pcm))
+
+    def _eq_btn_state(self):
+        on = self.eq.active()
+        self.eq_btn.setChecked(on)
+        self.eq_btn.setStyleSheet("QPushButton { color: #81c784; font-weight: bold; }" if on else "")
+
+    def _open_eq(self):
+        if self._eq_panel is None:
+            from smashdr.ui.eq_panel import EqPanel
+            self._eq_panel = EqPanel(self.eq.gains, self.eq.enabled, self)
+            self._eq_panel.changed.connect(self._eq_changed)
+        self._eq_panel.show()
+        self._eq_panel.raise_()
+        self._eq_btn_state()
+
+    def _eq_changed(self, gains, on):
+        self.eq.set_gains(gains)
+        self.eq.enabled = on
+        self.opts["eq_gains"], self.opts["eq_on"] = gains, on
+        self._eq_btn_state()
 
     # ======================================================================
     # Frames
@@ -2194,6 +2225,7 @@ class MainWindow(QtWidgets.QMainWindow):
             auto_band=self.auto_band_chk.isChecked(),
             squelch_db=self.sq_slider.value(),
             volume=self.vol_slider.value(),
+            eq_gains=self.eq.gains, eq_on=self.eq.enabled,
             mute=self.mute_chk.isChecked(),
             nfm_deemph_us=self.nfm_de_box.currentData(),
             wfm_deemph_us=self.wfm_de_box.currentData(),
