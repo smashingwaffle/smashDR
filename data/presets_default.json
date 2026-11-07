@@ -879,6 +879,14 @@
       "note": "Distress and calling"
     },
     {
+      "name": "AIS ships",
+      "freq_hz": 162000000,
+      "mode": "NFM",
+      "group": "Marine",
+      "step_hz": 25000,
+      "note": "Centre between AIS 1 (161.975) and AIS 2 (162.025). Ships show on the Aircraft map (Ships layer) while 162 MHz is in the span."
+    },
+    {
       "name": "KCRW",
       "freq_hz": 89900000,
       "mode": "WFM",

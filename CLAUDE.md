@@ -158,6 +158,12 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   baro / 5,0 track, GS, TAS, roll / 6,0 magnetic heading, IAS, Mach (pyModeS
   rules + check vs ADS-B track; ambiguous -> dropped) -> p['ehs'] (+ t_<bds>).
   Shown in the card ('Radar data') and as 'alt ➜ selected' in the Alt column.
+- Ships: `decoders/ais.py` AisRx (two Channelizers 161.975/162.025 -> 48 kHz, FM discriminator,
+  1-bit smoothing + DC removal, slice all 5 phases, NRZI, HDLC flags, destuff, CRC X.25 LSB-first,
+  types 1-3/5/18/19/21/24) + ShipTracker (MMSI, flag from MID, 30 min expiry). SdrReader._run_ais
+  runs it whenever both channels fit in the span (0.17x realtime) -> `ais` signal ->
+  AircraftTab.on_ais -> 'Ships (AIS)' overlay on the plane map (opt adsb_map_ships). Preset
+  'AIS ships' 162.000. Test: `python -m tests.test_ais` (gpsd vectors + synthetic GMSK). Untested on air.
 - ISS tab: `core/satellites.py` (vendored pure-Python SGP4 in smashdr/thirdparty/sgp4,
   MIT; TEME->ECEF via GMST; look angles, Doppler, sunlit/visible, passes 48 h; TLE from
   CelesTrak cached 12 h in user/cache/tle.json) + `ui/satellites.py` SatTab (Leaflet map

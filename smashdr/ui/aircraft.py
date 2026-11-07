@@ -20,6 +20,7 @@ from smashdr.paths import USER
 from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import cu8_to_iq
 from smashdr.decoders import adsb
+from smashdr.decoders import ais as ais_dec
 
 from PyQt6 import QtNetwork
 
@@ -137,6 +138,9 @@ html,body,#map{height:100%;margin:0;background:#1e1e1e}
 .apt:before{display:none}
 .apt.airline{color:#fff;font-size:11px;background:rgba(41,98,255,.55)}
 .apt.military{color:#c5e1a5}
+.sh{font:600 10px Segoe UI,Arial,sans-serif;color:#e0f7fa;background:rgba(0,40,60,.78);
+    border:1px solid rgba(0,217,232,.25);border-radius:8px;box-shadow:none;padding:0 5px}
+.sh:before{display:none}
 </style></head><body><div id="map"></div><script>
 var VIEW = __VIEW__;
 var map = L.map('map', {zoomControl:true}).setView(VIEW ? [VIEW[0], VIEW[1]] : [__LAT__, __LON__], VIEW ? VIEW[2] : 9);
@@ -188,7 +192,11 @@ if (showApts) airportLayer.addTo(map);
 map.on('zoomend', aptLabels); map.whenReady(aptLabels);
 map.on('overlayadd', function(e){ if (e.layer === airportLayer){ aptLabels(); console.log('AIRPORTS:1'); } });
 map.on('overlayremove', function(e){ if (e.layer === airportLayer) console.log('AIRPORTS:0'); });
-L.control.layers(layers, {'Airports': airportLayer}, {position: 'topright'}).addTo(map);
+var shipLayer = L.layerGroup();
+if (__SHOW_SHIPS__) shipLayer.addTo(map);
+map.on('overlayadd', function(e){ if (e.layer === shipLayer) console.log('SHIPS:1'); });
+map.on('overlayremove', function(e){ if (e.layer === shipLayer) console.log('SHIPS:0'); });
+L.control.layers(layers, {'Airports': airportLayer, 'Ships (AIS)': shipLayer}, {position: 'topright'}).addTo(map);
 map.on('baselayerchange', function(e){ console.log('LAYER:' + e.name); });
 map.on('moveend', function(){ var c = map.getCenter();
   console.log('VIEW:' + c.lat.toFixed(5) + ',' + c.lng.toFixed(5) + ',' + map.getZoom()); });
@@ -268,6 +276,61 @@ function selectPlane(icao, center){
     if (o && center){ map.panTo(o.m.getLatLng()); }
   }
 }
+var shipObjs = {};
+var SHIPCOL = {cargo:'#66bb6a', tanker:'#ef5350', passenger:'#42a5f5', tug:'#26c6da',
+  pleasure:'#ce93d8', fishing:'#ffb74d', special:'#ffee58', other:'#b0bec5', unknown:'#90a4ae'};
+function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function shipIcon(s){
+  var c = SHIPCOL[s.cat] || '#90a4ae';
+  if (s.aton) return L.divIcon({className:'', iconSize:[12,12], iconAnchor:[6,6],
+    html:'<svg width="12" height="12" viewBox="-6 -6 12 12"><path d="M0,-5 L5,0 L0,5 L-5,0 Z" fill="#ffd54f" stroke="#111"/></svg>'});
+  var r = s.heading != null ? s.heading : (s.cog != null ? s.cog : 0);
+  var moving = s.sog != null && s.sog > 0.5;
+  var path = moving ? 'M0,-9 L4,-3 L4,8 L-4,8 L-4,-3 Z' : 'M0,-6 L4,-2 L4,6 L-4,6 L-4,-2 Z';
+  return L.divIcon({className:'', iconSize:[20,20], iconAnchor:[10,10],
+    html:'<svg width="20" height="20" viewBox="-10 -10 20 20" style="transform:rotate('+r+'deg)">' +
+         '<path d="'+path+'" fill="'+c+'" stroke="#111" stroke-width="0.8"/></svg>'});
+}
+function shipPopup(s){
+  var rows = [];
+  if (s.type_name) rows.push(esc(s.type_name) + (s.status ? ' · ' + esc(s.status) : ''));
+  if (s.destination) rows.push('To <b>' + esc(s.destination) + '</b>' + (s.eta ? ' · ETA ' + esc(s.eta) : ''));
+  if (s.sog != null) rows.push(s.sog.toFixed(1) + ' kn' + (s.cog != null ? ' · course ' + Math.round(s.cog) + '°' : ''));
+  if (s.length) rows.push(s.length + ' × ' + (s.beam || '?') + ' m' + (s.draught ? ' · draught ' + s.draught + ' m' : ''));
+  rows.push('MMSI ' + s.mmsi + (s.callsign ? ' · ' + esc(s.callsign) : '') + (s.imo ? ' · IMO ' + s.imo : '') +
+            (s.flag ? ' · ' + s.flag.toUpperCase() : ''));
+  return '<b>' + esc(s.name || ('MMSI ' + s.mmsi)) + '</b><br>' + rows.join('<br>');
+}
+function shipLabels(){
+  var show = map.getZoom() >= 11;
+  Object.keys(shipObjs).forEach(function(k){ var m = shipObjs[k].m;
+    if (show && !m.isTooltipOpen()) m.openTooltip();
+    if (!show && m.isTooltipOpen()) m.closeTooltip(); });
+}
+map.on('zoomend', shipLabels);
+function ships(list){
+  var seen = {};
+  list.forEach(function(s){
+    if (s.lat == null) return;
+    seen[s.mmsi] = true;
+    var o = shipObjs[s.mmsi], lbl = s.name || String(s.mmsi);
+    if (!o){
+      o = shipObjs[s.mmsi] = {m: L.marker([s.lat, s.lon], {icon: shipIcon(s)}).addTo(shipLayer),
+                              t: L.polyline(s.trail, {weight: 1, opacity: 0.5, color: SHIPCOL[s.cat] || '#90a4ae',
+                                                      interactive: false}).addTo(shipLayer)};
+      o.m.bindTooltip(lbl, {permanent: true, direction: 'right', offset: [8, 0], className: 'sh'});
+      o.m.bindPopup(shipPopup(s));
+    } else {
+      o.m.setLatLng([s.lat, s.lon]); o.m.setIcon(shipIcon(s)); o.m.setTooltipContent(lbl);
+      o.m.setPopupContent(shipPopup(s)); o.t.setLatLngs(s.trail);
+    }
+  });
+  Object.keys(shipObjs).forEach(function(k){
+    if (!seen[k]){ shipLayer.removeLayer(shipObjs[k].m); shipLayer.removeLayer(shipObjs[k].t); delete shipObjs[k]; }
+  });
+  shipLabels();
+}
 map.on('click', function(){ if (selected){ selectPlane(null); console.log('SELECT:'); } });
 </script></body></html>"""
 
@@ -307,6 +370,8 @@ if HAVE_WEB:
                 self.pref.emit("view", message[5:])
             elif message.startswith("AIRPORTS:"):
                 self.pref.emit("airports", message[9:])
+            elif message.startswith("SHIPS:"):
+                self.pref.emit("ships", message[6:])
 
 
 def _field(data, key):
@@ -562,6 +627,16 @@ class AircraftTab(QtWidgets.QWidget):
             box.setValue(float(val))
             box.valueChanged.connect(self._home_changed)
         self.stat_lbl = QtWidgets.QLabel("Stopped")
+        self.ships = ais_dec.ShipTracker()
+        self._ais_msgs = 0
+        self._ship_timer = QtCore.QTimer(self)
+        self._ship_timer.timeout.connect(self._push_ships)
+        self._ship_timer.start(2000)
+        self.ship_lbl = QtWidgets.QLabel("")
+        self.ship_lbl.setStyleSheet("color: #26c6da;")
+        self.ship_lbl.setToolTip("AIS ships (161.975 / 162.025 MHz), decoded by the scanner's dongle\n"
+                                 "whenever 162 MHz is inside its span (tune the receiver to 162.000).\n"
+                                 "Toggle 'Ships (AIS)' in the map's layer menu.")
 
         bar = QtWidgets.QHBoxLayout()
         bar.addWidget(QtWidgets.QLabel("Device"))
@@ -575,6 +650,7 @@ class AircraftTab(QtWidgets.QWidget):
         bar.addWidget(self.lon_box)
         bar.addSpacing(20)
         bar.addWidget(self.stat_lbl, 1)
+        bar.addWidget(self.ship_lbl)
 
         self.card = InfoCard()
 
@@ -718,6 +794,7 @@ class AircraftTab(QtWidgets.QWidget):
                 .replace("__VIEW__", json.dumps(view if isinstance(view, list) and len(view) == 3 else None))
                 .replace("__LAYER__", json.dumps(str(self.opts.get("adsb_map_layer", ""))))
                 .replace("__AIRPORTS__", json.dumps(airports.map_list()))
+                .replace("__SHOW_SHIPS__", "true" if self.opts.get("adsb_map_ships", True) else "false")
                 .replace("__SHOW_AIRPORTS__", "true" if self.opts.get("adsb_map_airports", True) else "false")
                 .replace("__CARTO_KEY__", json.dumps(str(self.opts.get("carto_key", "")).strip())))
         self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/"))
@@ -727,6 +804,8 @@ class AircraftTab(QtWidgets.QWidget):
             self.opts["adsb_map_layer"] = value
         elif kind == "airports":
             self.opts["adsb_map_airports"] = value == "1"
+        elif kind == "ships":
+            self.opts["adsb_map_ships"] = value == "1"
         elif kind == "view":
             try:
                 lat, lon, z = value.split(",")
@@ -742,8 +821,42 @@ class AircraftTab(QtWidgets.QWidget):
 
     def _map_loaded(self, ok):
         self._map_ready = bool(ok)
+        if ok:
+            self._push_ships()
         if not ok:
             self.stat_lbl.setText("Map failed to load (no internet?). The list still works.")
+
+    # ---- ships (AIS, from the scanner's SdrReader) -----------------------
+    def on_ais(self, msgs):
+        for m in msgs:
+            self.ships.update(m)
+        self._ais_msgs += len(msgs)
+        self._ships_dirty = True
+
+    def _push_ships(self):
+        self.ships.expire()
+        live = [s for s in self.ships.ships.values() if s["lat"] is not None]
+        n = sum(1 for s in live if not s["aton"])
+        self.ship_lbl.setText(f"{n} ships · {self._ais_msgs} AIS msgs" if self.ships.ships else "")
+        if not getattr(self, "_ships_dirty", True) or not (HAVE_WEB and self._map_ready):
+            return
+        self._ships_dirty = False
+        js = []
+        for s in live:
+            eta = s["eta"]
+            eta_s = (f"{eta[0]:02d}/{eta[1]:02d} {eta[2]:02d}:{eta[3]:02d} UTC"
+                     if eta and 1 <= eta[0] <= 12 and 1 <= eta[1] <= 31 and eta[2] < 24 else "")
+            st = s["status"]
+            js.append({"mmsi": s["mmsi"], "name": s["name"], "callsign": s["callsign"],
+                       "lat": s["lat"], "lon": s["lon"], "sog": s["sog"], "cog": s["cog"],
+                       "heading": s["heading"], "destination": s["destination"], "eta": eta_s,
+                       "type_name": ais_dec.ship_type_name(s["shiptype"]),
+                       "cat": ais_dec.ship_category(s["shiptype"]), "aton": s["aton"],
+                       "status": ais_dec.NAV_STATUS[st] if st is not None else "",
+                       "length": s["length"] or None, "beam": s["beam"] or None,
+                       "draught": s["draught"] or None, "imo": s["imo"], "flag": s["flag"],
+                       "trail": s["trail"]})
+        self._js(f"ships({json.dumps(js)})")
 
     def _js(self, code):
         if HAVE_WEB and self._map_ready:

@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.8.10"
+VERSION = "0.9.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -139,6 +139,7 @@ from smashdr.decoders.p25_live import P25Live  # noqa: E402
 from smashdr.decoders.p25_trunk import P25Trunk  # noqa: E402
 from smashdr.decoders.digital_live import DmrLive, DstarLive, YsfLive  # noqa: E402
 from smashdr.decoders import p25 as p25mod  # noqa: E402
+from smashdr.decoders import ais as ais_dec  # noqa: E402
 
 try:
     from smashdr.ui import audio  # noqa: E402
@@ -177,6 +178,7 @@ class SdrReader(QtCore.QThread):
     status = QtCore.pyqtSignal(str)
     p25_event = QtCore.pyqtSignal(object)
     transcript = QtCore.pyqtSignal(object)
+    ais = QtCore.pyqtSignal(object)           # list of decoded AIS messages
 
     def __init__(self, sdr: RtlSdr, opts: dict):
         super().__init__()
@@ -201,6 +203,8 @@ class SdrReader(QtCore.QThread):
         self._rec_path = None
         self._q = queue.Queue(maxsize=40)   # ~4 s of headroom at 2.4 MS/s
         self._cap = None
+        self._ais = None                    # AisRx while 161.975 + 162.025 are inside the span
+        self._ais_key = None
         # speech-to-text of finished clear P25 calls (optional: pip install faster-whisper)
         self._call_pcm = None               # list of 48 kHz chunks while a call is up
         self._an_pcm = None                 # same for analog (squelch-gated)
@@ -400,6 +404,28 @@ class SdrReader(QtCore.QThread):
             self.status.emit(f"Saved {self._rec_path.name} ({mb:.1f} MB)")
         self._rec = None
 
+    def _run_ais(self, iq, center, rate):
+        """Ships: decode AIS on the side whenever both AIS channels fit in the span."""
+        key = (center, rate)
+        if key != self._ais_key:
+            self._ais_key = key
+            self._ais = None
+            if ais_dec.AisRx.covers(rate, center):
+                try:
+                    self._ais = ais_dec.AisRx(rate, center)
+                except ValueError:
+                    pass
+        if self._ais is None:
+            return
+        try:
+            msgs = self._ais.process(iq)
+        except Exception as e:                  # never let ships take the receiver down
+            print("[!] AIS:", e)
+            self._ais = None
+            return
+        if msgs:
+            self.ais.emit(msgs)
+
     def _channel_above_floor(self, spec, center, rate):
         half = MODES[self.mode]["half_bw"]
         binw = rate / FFT_SIZE
@@ -456,6 +482,8 @@ class SdrReader(QtCore.QThread):
                 pcm = self.demod.process(iq, sq_open)
                 self.audio.emit(pcm.tobytes())
                 self._track_analog(pcm, sq_open)
+
+            self._run_ais(iq, center, rate)
 
             stats = {"clip": clip, "snr": snr, "sq_open": sq_open,
                      "drops": self._cap.dropped,
@@ -856,6 +884,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reader.status.connect(self.status_lbl.setText)
         self.reader.p25_event.connect(self.on_p25_event)
         self.reader.transcript.connect(self.on_transcript)
+        self.reader.ais.connect(self.aircraft_tab.on_ais)
 
         self.presets_win = None
         self._apply_mode_ui()
