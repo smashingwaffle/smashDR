@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.9.0"
+VERSION = "0.9.1"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -500,7 +500,7 @@ class SdrReader(QtCore.QThread):
 # Plot helpers
 # --------------------------------------------------------------------------
 class TuneViewBox(pg.ViewBox):
-    """ViewBox where the wheel tunes; Ctrl+wheel zooms around the mouse,
+    """ViewBox where the wheel tunes (Shift = 2x step, Alt = 1/2 step); Ctrl+wheel zooms around the mouse,
     middle-drag pans, middle-click resets the zoom (hooks set by MainWindow)."""
 
     zoom_hook = None          # (factor, x_mhz)
@@ -514,11 +514,19 @@ class TuneViewBox(pg.ViewBox):
         self.setMenuEnabled(False)
 
     def wheelEvent(self, ev, axis=None):
-        d = ev.delta() if hasattr(ev, "delta") else ev.angleDelta().y()
-        if d and (ev.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier) and TuneViewBox.zoom_hook:
+        if hasattr(ev, "delta"):
+            d = ev.delta()
+        else:                                   # Alt+wheel arrives as a horizontal wheel in Qt
+            a = ev.angleDelta()
+            d = a.y() or a.x()
+        mods = ev.modifiers()
+        M = QtCore.Qt.KeyboardModifier
+        if d and (mods & M.ControlModifier) and TuneViewBox.zoom_hook:
             TuneViewBox.zoom_hook(1.25 if d > 0 else 1 / 1.25, self.mapToView(ev.pos()).x())
         elif d:
-            self._on_wheel(1 if d > 0 else -1)
+            # Shift = double step, Alt = fine (half step)
+            mult = 2.0 if mods & M.ShiftModifier else 0.5 if mods & M.AltModifier else 1.0
+            self._on_wheel(1 if d > 0 else -1, mult)
         ev.accept()
 
     def mouseDragEvent(self, ev, axis=None):
@@ -1500,9 +1508,11 @@ class MainWindow(QtWidgets.QMainWindow):
         rate = self.rate_box.currentData()
         return min(300e3, rate * 0.2)
 
-    def _wheel_tune(self, direction: int):
-        base = round(self.target_hz / self.step_hz) * self.step_hz
-        self._tune(base + direction * self.step_hz, follow=True)
+    def _wheel_tune(self, direction: int, mult: float = 1.0):
+        inc = self.step_hz * mult                  # Shift = 2x step, Alt = half step (fine)
+        grid = min(self.step_hz, inc)
+        base = round(self.target_hz / grid) * grid
+        self._tune(base + direction * inc, follow=True)
 
     def _tune(self, hz, snap=False, apply_band_defaults=True, follow=False):
         hz = float(hz)
