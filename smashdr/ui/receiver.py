@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.9.1"
+VERSION = "0.9.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1756,16 +1756,19 @@ class MainWindow(QtWidgets.QMainWindow):
                 continue
             seen.add(f)
             col = self.GRANT_COLOURS.get(state, "#bdbdbd")
+            word = {"playing": "▶ ", "encrypted": "🔒 ", "phase 2": "P2 "}.get(state, "")
+            # label rides on the line, placed relative to the view so it never scrolls off the top;
+            # alternate heights so neighbouring grants don't overlap
             line = pg.InfiniteLine(pos=f / 1e6, angle=90, movable=False,
-                                   pen=pg.mkPen(col, width=2, style=QtCore.Qt.PenStyle.DashLine))
-            word = {"playing": "▶ ", "encrypted": "🔒 "}.get(state, "")
-            label = pg.TextItem(f"{word}TG {g['tgid']}", color=col, anchor=(0.5, 1.0),
-                                fill=pg.mkBrush(0, 0, 0, 170))
-            label.setPos(f / 1e6, -12)
-            for it in (line, label):
-                it.setZValue(20)
-                self.spec_plot.addItem(it)
-                self._gm_items.append(it)
+                                   pen=pg.mkPen(col, width=2, style=QtCore.Qt.PenStyle.DashLine),
+                                   label=f"{word}TG {g['tgid']}",
+                                   labelOpts={"position": 0.93 - 0.09 * (len(seen) % 2 == 0),
+                                              "color": col, "fill": pg.mkBrush(0, 0, 0, 200),
+                                              "movable": False, "anchors": [(0.5, 0), (0.5, 0)]})
+            line.setToolTip(f"TG {g['tgid']} → {f / 1e6:.4f} MHz  ({state})")
+            line.setZValue(20)
+            self.spec_plot.addItem(line)
+            self._gm_items.append(line)
 
     def _show_cc(self, ev):
         """Control channel line: system, site and the grants being followed."""
