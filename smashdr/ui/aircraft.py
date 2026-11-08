@@ -582,6 +582,7 @@ class InfoCard(QtWidgets.QFrame):
 
 class AircraftTab(QtWidgets.QWidget):
     emergency = QtCore.pyqtSignal(str)       # summary text, "" when none are active
+    tune_request = QtCore.pyqtSignal(int)    # Hz: put the scanner on AIS (NFM)
 
     def __init__(self, opts: dict, devices: list, busy_index: int, parent=None):
         super().__init__(parent)
@@ -651,6 +652,11 @@ class AircraftTab(QtWidgets.QWidget):
         bar.addSpacing(20)
         bar.addWidget(self.stat_lbl, 1)
         bar.addWidget(self.ship_lbl)
+        self.ais_btn = QtWidgets.QPushButton("⚓ Ships (AIS 161.975 / 162.025)")
+        self.ais_btn.setToolTip("Tune the scanner to 162.000 MHz NFM so both AIS channels are in its\n"
+                                "span; ships then show on this map (layer 'Ships (AIS)').")
+        self.ais_btn.clicked.connect(lambda: self.tune_request.emit(162_000_000))
+        bar.addWidget(self.ais_btn)
 
         self.card = InfoCard()
 

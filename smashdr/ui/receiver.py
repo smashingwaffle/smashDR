@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.9.2"
+VERSION = "0.9.3"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -871,6 +871,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                         int(opts.get("_opened_device", opts["device_index"])))
         tabs.addTab(self.aircraft_tab, "Aircraft")
         self.aircraft_tab.emergency.connect(self._aircraft_emergency)
+        self.aircraft_tab.tune_request.connect(self._sat_tune)
         from smashdr.ui.satellites import SatTab
         self.sat_tab = SatTab(opts)
         self.sat_tab.tune_request.connect(self._sat_tune)
