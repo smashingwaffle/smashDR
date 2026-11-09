@@ -170,7 +170,9 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   MIT; TEME->ECEF via GMST; look angles, Doppler, sunlit/visible, passes 48 h; TLE from
   CelesTrak cached 12 h in user/cache/tle.json) + `ui/satellites.py` SatTab (Leaflet map
   with track/footprint, pass table, SkyPlot polar plot, ntfy alert before good passes,
-  'Tune receiver' + optional Doppler follow -> MainWindow._sat_tune).
+  'Tune receiver' + optional Doppler follow -> MainWindow._sat_tune; auto switch to ISS APRS
+  145.825 N min before passes (opt sat_auto*), auto_switch signal -> MainWindow._sat_auto remembers
+  and restores the previous freq/mode after LOS).
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
   Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,

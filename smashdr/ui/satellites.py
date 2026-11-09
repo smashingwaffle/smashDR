@@ -132,6 +132,7 @@ class SkyPlot(pg.PlotWidget):
 
 class SatTab(QtWidgets.QWidget):
     tune_request = QtCore.pyqtSignal(int)          # Hz: tune the receiver (NFM)
+    auto_switch = QtCore.pyqtSignal(bool)          # True: remember the receiver's channel; False: go back
 
     def __init__(self, opts: dict, parent=None):
         super().__init__(parent)
@@ -146,6 +147,8 @@ class SatTab(QtWidgets.QWidget):
         self._last_map = 0.0
         self._doppler_on = False
         self._last_tune = 0.0
+        self._auto_pass = None                     # (sat, aos) of the pass we switched for
+        self._auto_done = set()
 
         self.sat_box = QtWidgets.QComboBox()
         self.sat_box.addItems(list(S.SATS))
@@ -205,10 +208,31 @@ class SatTab(QtWidgets.QWidget):
             arow.addWidget(w)
         arow.addStretch(1)
 
+        self.auto_chk = QtWidgets.QCheckBox("Switch the receiver to ISS APRS 145.825")
+        self.auto_chk.setToolTip("Before a pass the receiver tunes to the APRS downlink (NFM) and follows\n"
+                                 "Doppler while the ISS is up; after the pass it goes back to the\n"
+                                 "frequency and mode you were on.")
+        self.auto_chk.setChecked(bool(opts.get("sat_auto", False)))
+        self.auto_min = QtWidgets.QSpinBox()
+        self.auto_min.setRange(1, 60)
+        self.auto_min.setSuffix(" min before")
+        self.auto_min.setValue(int(opts.get("sat_auto_min", 10)))
+        self.auto_el = QtWidgets.QSpinBox()
+        self.auto_el.setRange(0, 90)
+        self.auto_el.setPrefix("passes above ")
+        self.auto_el.setSuffix("°")
+        self.auto_el.setValue(int(opts.get("sat_auto_el", 10)))
+        self.auto_chk.toggled.connect(self._auto_toggled)
+        brow = QtWidgets.QHBoxLayout()
+        for w in (self.auto_chk, self.auto_min, self.auto_el):
+            brow.addWidget(w)
+        brow.addStretch(1)
+
         left = QtWidgets.QVBoxLayout()
         left.addWidget(QtWidgets.QLabel("<b>Passes over home (next 2 days)</b>"))
         left.addWidget(self.table, 1)
         left.addLayout(arow)
+        left.addLayout(brow)
         sky_box = QtWidgets.QVBoxLayout()
         sky_box.addWidget(self.sky, 1)
         sky_box.addWidget(self.sky_lbl)
@@ -389,7 +413,7 @@ class SatTab(QtWidgets.QWidget):
                 f"<span style='color:#66bb6a'><b>OVERHEAD NOW</b></span>  ·  az {az:.0f}° {S.compass(az)}  ·  "
                 f"el {el:.0f}°  ·  {rng:,.0f} km  ·  Doppler {dop / 1000:+.1f} kHz → "
                 f"<b>{(f0 + dop) / 1e6:.4f} MHz</b>  ·  ends in {_dur(p.los - t)}")
-            if self.dopp_chk.isChecked() and t - self._last_tune >= 2:
+            if self.dopp_chk.isChecked() and self._auto_pass is None and t - self._last_tune >= 2:
                 self._tune(doppler=True)
         else:
             nxt = next((q for q in self.passes if q.aos > t), None)
@@ -405,7 +429,50 @@ class SatTab(QtWidgets.QWidget):
             if self.passes and self.passes[-1].aos < t + 6 * 3600:
                 self._load(force=False)             # keep 2 days ahead
         self._alerts(t)
+        self._auto(t)
         self._update_map(t)
+
+    # ---- auto switch to ISS APRS ---------------------------------------------------
+    APRS_HZ = 145_825_000
+
+    def _auto(self, t):
+        if self._auto_pass is not None:
+            name, aos, los = self._auto_pass
+            if t > los + 30:                                   # pass over: hand the receiver back
+                self._auto_pass = None
+                self.auto_switch.emit(False)
+            elif aos - 30 <= t and t - self._last_tune >= 2:   # up: keep on the Doppler-shifted downlink
+                self._tune_aprs(t)
+            return
+        if not self.auto_chk.isChecked() or self.sat is None or self.sat.name != "ISS":
+            return
+        lead = self.auto_min.value() * 60
+        for p in self.passes:
+            key = (self.sat.name, round(p.aos))
+            if key in self._auto_done or p.max_el < self.auto_el.value():
+                continue
+            if p.aos - lead <= t <= p.los:
+                self._auto_done.add(key)
+                self._auto_pass = (self.sat.name, p.aos, p.los)
+                self.auto_switch.emit(True)                     # main window remembers where it was
+                self._tune_aprs(t)
+                break
+
+    def _tune_aprs(self, t):
+        hz = self.APRS_HZ
+        try:
+            _az, el, _r, rr = self.sat.look(t, self.home())
+            if el > 0:
+                hz += S.doppler(self.APRS_HZ, rr)
+        except ValueError:
+            pass
+        self._last_tune = t
+        self.tune_request.emit(int(round(hz / 100) * 100))
+
+    def _auto_toggled(self, on):
+        if not on and self._auto_pass is not None:              # unticked mid-pass: go back now
+            self._auto_pass = None
+            self.auto_switch.emit(False)
 
     def _alerts(self, t):
         if not self.alert_chk.isChecked():
@@ -436,4 +503,5 @@ class SatTab(QtWidgets.QWidget):
     def collect(self):
         self.opts.update(sat_split=self.split.sizes(), sat_alert=self.alert_chk.isChecked(),
                          sat_alert_el=self.alert_el.value(), sat_alert_min=self.alert_min.value(),
-                         sat_doppler=self.dopp_chk.isChecked())
+                         sat_doppler=self.dopp_chk.isChecked(), sat_auto=self.auto_chk.isChecked(),
+                         sat_auto_min=self.auto_min.value(), sat_auto_el=self.auto_el.value())

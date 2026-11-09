@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.9.3"
+VERSION = "0.9.4"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -875,6 +875,7 @@ class MainWindow(QtWidgets.QMainWindow):
         from smashdr.ui.satellites import SatTab
         self.sat_tab = SatTab(opts)
         self.sat_tab.tune_request.connect(self._sat_tune)
+        self.sat_tab.auto_switch.connect(self._sat_auto)
         tabs.addTab(self.sat_tab, "ISS")
         tabs.addTab(self._build_settings_tab(), "Settings")
         tabs.setCurrentIndex(min(max(int(opts.get("tab", 0)), 0), tabs.count() - 1))
@@ -1617,6 +1618,21 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.mode != "NFM":
             self._set_mode("NFM")
         self._tune(hz, apply_band_defaults=False)
+
+    def _sat_auto(self, on):
+        """ISS tab auto switch: remember the channel before a pass, return to it afterwards."""
+        if on:
+            self._sat_prev = (self.target_hz, self.mode)
+            self.status_lbl.setText("ISS pass coming: receiver switched to APRS 145.825")
+        else:
+            prev = getattr(self, "_sat_prev", None)
+            self._sat_prev = None
+            if prev:
+                hz, mode = prev
+                if mode != self.mode:
+                    self._set_mode(mode)
+                self._tune(hz, apply_band_defaults=False)
+                self.status_lbl.setText(f"ISS pass over: back on {hz / 1e6:.4f} MHz {mode}")
 
     def _aircraft_emergency(self, text):
         """Flash the Aircraft tab while any plane has a confirmed emergency squawk."""
