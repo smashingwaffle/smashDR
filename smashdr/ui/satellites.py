@@ -13,6 +13,7 @@ import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from smashdr.core import notify
+from smashdr.paths import USER
 from smashdr.core import satellites as S
 from smashdr.ui.aircraft import DEFAULT_HOME, HAVE_WEB, QWebEngineView
 
@@ -63,6 +64,22 @@ function update(lat, lon, radius, back, fwd) {
   if (follow) map.panTo([lat, lon], {animate: false});
 }
 function followIss() { follow = true; }
+var stLayer = L.layerGroup().addTo(map), stObjs = {};
+function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function stations(list) {       // APRS stations heard with a position
+  list.forEach(function(s){
+    var col = s.iss ? '#ff8a65' : '#81c784', o = stObjs[s.call];
+    var pop = '<b>' + esc(s.call) + '</b>' + (s.iss ? ' (via the ISS)' : '') + '<br>' + esc(s.when) +
+              '<br><span style="font-family:Consolas,monospace">' + esc(s.text) + '</span>';
+    if (!o) {
+      o = stObjs[s.call] = L.circleMarker([s.lat, s.lon], {radius: 5, color: '#111', weight: 1,
+            fillColor: col, fillOpacity: 1}).addTo(stLayer);
+      o.bindTooltip(esc(s.call), {direction: 'top'});
+      o.bindPopup(pop);
+    } else { o.setLatLng([s.lat, s.lon]); o.setStyle({fillColor: col}); o.setPopupContent(pop); }
+  });
+}
 </script></body></html>"""
 
 
@@ -229,8 +246,25 @@ class SatTab(QtWidgets.QWidget):
         brow.addStretch(1)
 
         left = QtWidgets.QVBoxLayout()
-        left.addWidget(QtWidgets.QLabel("<b>Passes over home (next 2 days)</b>"))
-        left.addWidget(self.table, 1)
+        self.pk_table = QtWidgets.QTableWidget(0, 5)
+        self.pk_table.setHorizontalHeaderLabels(["Time", "Channel", "From", "Type", "Packet"])
+        self.pk_table.verticalHeader().setVisible(False)
+        self.pk_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.pk_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        hh = self.pk_table.horizontalHeader()
+        for c in range(4):
+            hh.setSectionResizeMode(c, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.pk_table.setWordWrap(False)
+        self.pk_table.itemDoubleClicked.connect(self._pk_clicked)
+        self.stations = {}                          # call -> station with a position, for the map
+        self.lists = QtWidgets.QTabWidget()
+        self.lists.addTab(self.table, "Passes over home (next 2 days)")
+        self.lists.addTab(self.pk_table, "APRS packets")
+        self.lists.setTabToolTip(1, "Decoded from 145.825 (ISS) and 144.390 (APRS) whenever they are in the\n"
+                                    "receiver's span. Orange = digipeated by the ISS. Double-click: show on the map.\n"
+                                    "Also logged to user/aprs.txt.")
+        left.addWidget(self.lists, 1)
         left.addLayout(arow)
         left.addLayout(brow)
         sky_box = QtWidgets.QVBoxLayout()
@@ -249,7 +283,7 @@ class SatTab(QtWidgets.QWidget):
         self.split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         if HAVE_WEB:
             self.map = QWebEngineView()
-            self.map.loadFinished.connect(lambda ok: setattr(self, "_map_ready", bool(ok)))
+            self.map.loadFinished.connect(self._map_loaded)
             self.split.addWidget(self.map)
         else:
             self.map = None
@@ -372,6 +406,67 @@ class SatTab(QtWidgets.QWidget):
                 .replace("__CARTO_KEY__", json.dumps(str(self.opts.get("carto_key", "")).strip())))
         self._map_ready = False
         self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/sat"))
+
+    def _map_loaded(self, ok):
+        self._map_ready = bool(ok)
+        if ok and self.stations:
+            self._push_stations(list(self.stations.values()))
+
+    # ---- APRS packets (from the receiver) --------------------------------------
+    KIND = {"position": "position", "message": "message", "status": "status", "telemetry": "telemetry"}
+
+    def on_aprs(self, pkts):
+        t = self.pk_table
+        new_st = []
+        for p in pkts:
+            when = time.strftime("%H:%M:%S", time.localtime(p["t"]))
+            chan = "ISS 145.825" if p["band"] == "ISS" else "APRS 144.390"
+            if p["via_iss"]:
+                chan += " · via ISS"
+            kind = self.KIND.get(p.get("kind"), "")
+            if kind == "message":
+                kind = f"msg → {p.get('to', '')}"
+            t.insertRow(0)
+            for c, v in enumerate((when, chan, p["src"], kind, p["text"])):
+                it = QtWidgets.QTableWidgetItem(v)
+                if p["via_iss"]:
+                    it.setForeground(QtGui.QColor("#ff8a65"))
+                if c == 4:
+                    it.setToolTip(p["text"])
+                t.setItem(0, c, it)
+            t.item(0, 0).setData(QtCore.Qt.ItemDataRole.UserRole, p["src"])
+            if p.get("lat") is not None:
+                st = {"call": p["src"], "lat": round(p["lat"], 5), "lon": round(p["lon"], 5),
+                      "iss": bool(p["via_iss"] or self.stations.get(p["src"], {}).get("iss")),
+                      "when": f"{when} on {chan}", "text": p["text"][:200]}
+                self.stations[p["src"]] = st
+                new_st.append(st)
+            try:
+                USER.mkdir(exist_ok=True)
+                with open(USER / "aprs.txt", "a", encoding="utf-8") as f:
+                    f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(p['t']))}  "
+                            f"{p['freq'] / 1e6:.3f}  {p['text']}\n")
+            except OSError:
+                pass
+        while t.rowCount() > 500:
+            t.removeRow(t.rowCount() - 1)
+        n = t.rowCount()
+        iss = sum(1 for r in range(n) if "via ISS" in (t.item(r, 1).text() if t.item(r, 1) else ""))
+        self.lists.setTabText(1, f"APRS packets ({n}{f', {iss} via ISS' if iss else ''})")
+        if new_st:
+            self._push_stations(new_st)
+
+    def _push_stations(self, sts):
+        if self.map is not None and self._map_ready:
+            self.map.page().runJavaScript(f"stations({json.dumps(sts)})")
+
+    def _pk_clicked(self, item):
+        call = self.pk_table.item(item.row(), 0).data(QtCore.Qt.ItemDataRole.UserRole)
+        st = self.stations.get(call)
+        if st and self.map is not None and self._map_ready:
+            self.map.page().runJavaScript(
+                f"follow = false; map.setView([{st['lat']}, {st['lon']}], 8); "
+                f"if (stObjs[{json.dumps(call)}]) stObjs[{json.dumps(call)}].openPopup();")
 
     def _update_map(self, t):
         if self.map is None or not self._map_ready or t - self._last_map < 5:

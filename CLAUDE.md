@@ -173,6 +173,13 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   'Tune receiver' + optional Doppler follow -> MainWindow._sat_tune; auto switch to ISS APRS
   145.825 N min before passes (opt sat_auto*), auto_switch signal -> MainWindow._sat_auto remembers
   and restores the previous freq/mode after LOS).
+- APRS: `decoders/aprs.py` AprsRx on 145.825 (ISS) + 144.390 whenever in span (fixed channels, ISS
+  Doppler is inside the filter): FM discriminator, 1200/2200 correlators (1 bit), twists 0.5/1/2,
+  run-length clock (round(run/40) bits), NRZI/HDLC/CRC shared with ais.py, AX.25 UI -> TNC2 +
+  parse_aprs (uncompressed, compressed, Mic-E, message, status, third party). Decodes the last 4 s
+  every 1 s, dedupe 30 s; 0.16x realtime. SdrReader._run_aprs -> `aprs` signal -> SatTab.on_aprs:
+  'APRS packets' tab next to passes, stations on the ISS map (orange = via RS0ISS), user/aprs.txt.
+  Test: `python -m tests.test_aprs` (synthetic AFSK + Doppler). Untested on air.
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
   Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
