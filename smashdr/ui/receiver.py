@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.10.4"
+VERSION = "0.10.5"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -2488,6 +2488,21 @@ def open_sdr(opts) -> RtlSdr:
     return sdr
 
 
+_QT_NOISE = ("QIODevice::read (QSslSocket): device not open",)
+
+
+def _quiet_qt():
+    """Hide known-harmless Qt chatter: a finished HTTPS download (flags, photos, lookups) being read
+    once more after its connection closed, and Chromium's GPU/HDR probing in the map view."""
+    os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--log-level=3")
+
+    def handler(mode, ctx, msg):
+        if any(n in msg for n in _QT_NOISE):
+            return
+        sys.stderr.write(msg + "\n")
+    QtCore.qInstallMessageHandler(handler)
+
+
 def main():
     ap = argparse.ArgumentParser(description="smashDR receiver")
     ap.add_argument("--freq", type=float, help="frequency in MHz")
@@ -2499,6 +2514,7 @@ def main():
 
     opts = resolve_options(args)
     sdr = open_sdr(opts)
+    _quiet_qt()
     app = QtWidgets.QApplication(sys.argv)
     win = MainWindow(sdr, opts)
     win.show()
