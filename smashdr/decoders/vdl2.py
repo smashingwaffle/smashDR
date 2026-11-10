@@ -634,7 +634,7 @@ def media_advisory(text):
             + (f" (available: {', '.join(up)})" if up else ""))
 
 
-_ROUTE = re.compile(r"(?<![A-Z])([KPC][A-Z]{3}|M[MGHNRPSUWYZ][A-Z]{2})[ ,/-]?([KPC][A-Z]{3}|M[MGHNRPSUWYZ][A-Z]{2})(?![A-Z])")
+_ROUTE = re.compile(r"(?<![A-Z])([KPC][A-Z]{3}|M[MGHNRPSUWYZ][A-Z]{2})[ ,/-]?([KPC][A-Z]{3}|M[MGHNRPSUWYZ][A-Z]{2})")
 
 
 def route(text):
