@@ -258,13 +258,29 @@ class SatTab(QtWidgets.QWidget):
         self.pk_table.setWordWrap(False)
         self.pk_table.itemDoubleClicked.connect(self._pk_clicked)
         self.stations = {}                          # call -> station with a position, for the map
-        self.lists = QtWidgets.QTabWidget()
-        self.lists.addTab(self.table, "Passes over home (next 2 days)")
-        self.lists.addTab(self.pk_table, "APRS packets")
-        self.lists.setTabToolTip(1, "Decoded from 145.825 (ISS) and 144.390 (APRS) whenever they are in the\n"
-                                    "receiver's span. Orange = digipeated by the ISS. Double-click: show on the map.\n"
-                                    "Also logged to user/aprs.txt.")
-        left.addWidget(self.lists, 1)
+        left.addWidget(QtWidgets.QLabel("<b>Passes over home (next 2 days)</b>"))
+        left.addWidget(self.table, 1)
+
+        # APRS log, to the right of the map
+        self.pk_lbl = QtWidgets.QLabel("<b>APRS log</b>")
+        self.pk_lbl.setToolTip("Decoded from 145.825 (ISS) and 144.390 (APRS) whenever they are in the\n"
+                               "receiver's span. Orange = digipeated by the ISS. Double-click: show on the map.\n"
+                               "Everything is also written to user/aprs.txt.")
+        open_btn = QtWidgets.QPushButton("Open aprs.txt")
+        open_btn.clicked.connect(self._open_log)
+        clr_btn = QtWidgets.QPushButton("Clear")
+        clr_btn.setToolTip("Clear the list (the file is kept)")
+        clr_btn.clicked.connect(lambda: (self.pk_table.setRowCount(0), self._pk_count()))
+        ph = QtWidgets.QHBoxLayout()
+        ph.addWidget(self.pk_lbl, 1)
+        ph.addWidget(open_btn)
+        ph.addWidget(clr_btn)
+        pv = QtWidgets.QVBoxLayout()
+        pv.setContentsMargins(0, 0, 0, 0)
+        pv.addLayout(ph)
+        pv.addWidget(self.pk_table, 1)
+        self.pk_panel = QtWidgets.QWidget()
+        self.pk_panel.setLayout(pv)
         left.addLayout(arow)
         left.addLayout(brow)
         sky_box = QtWidgets.QVBoxLayout()
@@ -281,15 +297,20 @@ class SatTab(QtWidgets.QWidget):
         lower_w.setLayout(lower)
 
         self.split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+        self.hsplit = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
         if HAVE_WEB:
             self.map = QWebEngineView()
             self.map.loadFinished.connect(self._map_loaded)
-            self.split.addWidget(self.map)
+            self.hsplit.addWidget(self.map)
         else:
             self.map = None
             note = QtWidgets.QLabel("Install PyQt6-WebEngine for the map (pip install PyQt6-WebEngine).")
             note.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            self.split.addWidget(note)
+            self.hsplit.addWidget(note)
+        self.hsplit.addWidget(self.pk_panel)
+        hs = opts.get("sat_hsplit")
+        self.hsplit.setSizes(hs if isinstance(hs, list) and len(hs) == 2 else [560, 520])
+        self.split.addWidget(self.hsplit)
         self.split.addWidget(lower_w)
         sizes = opts.get("sat_split")
         self.split.setSizes(sizes if isinstance(sizes, list) and len(sizes) == 2 else [420, 360])
@@ -299,6 +320,7 @@ class SatTab(QtWidgets.QWidget):
         lay.addWidget(self.now_lbl)
         lay.addWidget(self.next_lbl)
         lay.addWidget(self.split, 1)
+        self._load_history()
 
         self.sat_box.currentTextChanged.connect(lambda _n: self._load(force=False))
         self.refresh_btn.clicked.connect(lambda: self._load(force=True))
@@ -415,14 +437,16 @@ class SatTab(QtWidgets.QWidget):
     # ---- APRS packets (from the receiver) --------------------------------------
     KIND = {"position": "position", "message": "message", "status": "status", "telemetry": "telemetry"}
 
-    def on_aprs(self, pkts):
+    def on_aprs(self, pkts, log=True):
         t = self.pk_table
         new_st = []
         for p in pkts:
-            when = time.strftime("%H:%M:%S", time.localtime(p["t"]))
-            chan = "ISS 145.825" if p["band"] == "ISS" else "APRS 144.390"
+            lt = time.localtime(p["t"])
+            when = time.strftime("%H:%M:%S" if time.time() - p["t"] < 20 * 3600 else "%b %d %H:%M", lt)
+            chan = "ISS" if p["band"] == "ISS" else "144.39"
             if p["via_iss"]:
                 chan += " · via ISS"
+            chan_tip = f"{p['freq'] / 1e6:.3f} MHz" + (" (digipeated by the ISS)" if p["via_iss"] else "")
             kind = self.KIND.get(p.get("kind"), "")
             if kind == "message":
                 kind = f"msg → {p.get('to', '')}"
@@ -433,6 +457,8 @@ class SatTab(QtWidgets.QWidget):
                     it.setForeground(QtGui.QColor("#ff8a65"))
                 if c == 4:
                     it.setToolTip(p["text"])
+                elif c == 1:
+                    it.setToolTip(chan_tip)
                 t.setItem(0, c, it)
             t.item(0, 0).setData(QtCore.Qt.ItemDataRole.UserRole, p["src"])
             if p.get("lat") is not None:
@@ -441,6 +467,8 @@ class SatTab(QtWidgets.QWidget):
                       "when": f"{when} on {chan}", "text": p["text"][:200]}
                 self.stations[p["src"]] = st
                 new_st.append(st)
+            if not log:
+                continue
             try:
                 USER.mkdir(exist_ok=True)
                 with open(USER / "aprs.txt", "a", encoding="utf-8") as f:
@@ -450,11 +478,50 @@ class SatTab(QtWidgets.QWidget):
                 pass
         while t.rowCount() > 500:
             t.removeRow(t.rowCount() - 1)
-        n = t.rowCount()
-        iss = sum(1 for r in range(n) if "via ISS" in (t.item(r, 1).text() if t.item(r, 1) else ""))
-        self.lists.setTabText(1, f"APRS packets ({n}{f', {iss} via ISS' if iss else ''})")
+        self._pk_count()
         if new_st:
             self._push_stations(new_st)
+
+    def _pk_count(self):
+        t = self.pk_table
+        n = t.rowCount()
+        iss = sum(1 for r in range(n) if "via ISS" in (t.item(r, 1).text() if t.item(r, 1) else ""))
+        self.pk_lbl.setText(f"<b>APRS log</b> ({n}{f', {iss} via ISS' if iss else ''})")
+
+    def _open_log(self):
+        f = USER / "aprs.txt"
+        if not f.exists():
+            QtWidgets.QMessageBox.information(self, "APRS log", "Nothing logged yet.")
+            return
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(f)))
+
+    def _load_history(self, n=200):
+        """Last n packets from user/aprs.txt, so the log and the map survive a restart."""
+        from smashdr.decoders import aprs as A
+        try:
+            with open(USER / "aprs.txt", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()[-n:]
+        except OSError:
+            return
+        pkts = []
+        for ln in lines:
+            try:
+                d, tm, fq, text = ln.rstrip("\n").split(None, 3)
+                head, info = text.split(":", 1)
+                src, rest = head.split(">", 1)
+                dst, _, path = rest.partition(",")
+                t = time.mktime(time.strptime(f"{d} {tm}", "%Y-%m-%d %H:%M:%S"))
+                freq = float(fq) * 1e6
+            except ValueError:
+                continue
+            p = {"src": src, "dst": dst, "path": path, "info": info, "text": text, "t": t, "freq": freq,
+                 "band": "ISS" if abs(freq - 145_825_000) < 20_000 else "APRS",
+                 "via_iss": any(c.rstrip("*").split("-")[0] in ("RS0ISS", "NA1SS", "ARISS") and c.endswith("*")
+                                for c in path.split(",")) or src.split("-")[0] == "RS0ISS"}
+            p.update(A.parse_aprs(info, dst))
+            pkts.append(p)
+        if pkts:
+            self.on_aprs(pkts, log=False)
 
     def _push_stations(self, sts):
         if self.map is not None and self._map_ready:
@@ -596,7 +663,7 @@ class SatTab(QtWidgets.QWidget):
         self.tune_request.emit(int(round(hz / 100) * 100))
 
     def collect(self):
-        self.opts.update(sat_split=self.split.sizes(), sat_alert=self.alert_chk.isChecked(),
+        self.opts.update(sat_split=self.split.sizes(), sat_hsplit=self.hsplit.sizes(), sat_alert=self.alert_chk.isChecked(),
                          sat_alert_el=self.alert_el.value(), sat_alert_min=self.alert_min.value(),
                          sat_doppler=self.dopp_chk.isChecked(), sat_auto=self.auto_chk.isChecked(),
                          sat_auto_min=self.auto_min.value(), sat_auto_el=self.auto_el.value())

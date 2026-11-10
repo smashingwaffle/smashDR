@@ -178,7 +178,8 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   run-length clock (round(run/40) bits), NRZI/HDLC/CRC shared with ais.py, AX.25 UI -> TNC2 +
   parse_aprs (uncompressed, compressed, Mic-E, message, status, third party). Decodes the last 4 s
   every 1 s, dedupe 30 s; 0.16x realtime. SdrReader._run_aprs -> `aprs` signal -> SatTab.on_aprs:
-  'APRS packets' tab next to passes, stations on the ISS map (orange = via RS0ISS), user/aprs.txt.
+  'APRS log' panel right of the ISS map (hsplit, opt sat_hsplit; last 200 lines reloaded from
+  user/aprs.txt at start), stations on the ISS map (orange = via RS0ISS).
   Test: `python -m tests.test_aprs` (synthetic AFSK + Doppler). Untested on air.
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
   Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
