@@ -727,8 +727,9 @@ class AircraftTab(QtWidgets.QWidget):
         ll.addLayout(srow)
         ll.addWidget(self.card)
         # Datalink: one row per aircraft (like the aircraft list), its messages below
-        self.dl_table = QtWidgets.QTableWidget(0, 6)
-        self.dl_table.setHorizontalHeaderLabels(["Flight", "Reg", "ICAO", "Msgs", "Last", "Latest message"])
+        self.dl_table = QtWidgets.QTableWidget(0, 7)
+        self.dl_table.setHorizontalHeaderLabels(["Flight", "Airline", "Reg", "ICAO", "Msgs", "Last",
+                                                 "Latest message"])
         self.dl_table.verticalHeader().setVisible(False)
         self.dl_table.verticalHeader().setDefaultSectionSize(30)
         self.dl_table.setIconSize(QtCore.QSize(40, 24))
@@ -740,7 +741,7 @@ class AircraftTab(QtWidgets.QWidget):
         self.dl_table.setWordWrap(False)
         dh = self.dl_table.horizontalHeader()
         dh.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        dh.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        dh.setSectionResizeMode(6, QtWidgets.QHeaderView.ResizeMode.Stretch)
         dh.setHighlightSections(False)
         self.dl_table.setStyleSheet(self.table.styleSheet())
         self.dl_table.itemSelectionChanged.connect(self._dl_selected)
@@ -753,6 +754,9 @@ class AircraftTab(QtWidgets.QWidget):
         dl_split.addWidget(self.dl_view)
         dl_split.setSizes([300, 260])
         self._dl_sel = None
+        self._dl_timer = QtCore.QTimer(self)
+        self._dl_timer.timeout.connect(lambda: self.vdl_msgs and self._fill_datalink())
+        self._dl_timer.start(5000)
         self.lists = QtWidgets.QTabWidget()
         self.lists.addTab(self.table, "Aircraft")
         self.lists.addTab(dl_split, "Datalink")
@@ -1045,11 +1049,12 @@ class AircraftTab(QtWidgets.QWidget):
             self._update_card()
 
     def _dl_name(self, ac):
-        """('United 794', 'UAL') from the ADS-B callsign if we see the plane, else from the ACARS flight."""
+        """(callsign, airline name, ICAO airline code) from the ADS-B callsign if we see the plane,
+        else from the ACARS flight id."""
         p = self._planes.get(ac["icao"])
         cs = (p or {}).get("callsign") or vdl2_dec.callsign(ac["flight"])
         name, code = flight_name(cs) if cs else ("", None)
-        return (name or ac["flight"] or ac["reg"] or ac["icao"]), code
+        return cs or ac["flight"] or ac["reg"] or ac["icao"], name, code
 
     def _fill_datalink(self):
         t = self.dl_table
@@ -1057,23 +1062,33 @@ class AircraftTab(QtWidgets.QWidget):
         rows = sorted(self.vdl_msgs.items(), key=lambda kv: -kv[1]["msgs"][-1]["t"])
         t.setRowCount(len(rows))
         now = time.time()
+        bold = QtGui.QFont()
+        bold.setBold(True)
         for r, (key, ac) in enumerate(rows):
             last = ac["msgs"][-1]
-            name, code = self._dl_name(ac)
+            cs, name, code = self._dl_name(ac)
             ago = int(now - last["t"])
-            vals = (name, ac["reg"], ac["icao"], str(len(ac["msgs"])),
+            vals = (cs, name or "", ac["reg"], ac["icao"], str(len(ac["msgs"])),
                     f"{ago}s" if ago < 60 else f"{ago // 60}m" if ago < 3600 else f"{ago // 3600}h",
                     ("▲ " if last["src_type"] == "aircraft" else "▼ ") + last["what"])
             for c, v in enumerate(vals):
                 it = QtWidgets.QTableWidgetItem(v)
                 if c == 0:
                     it.setData(QtCore.Qt.ItemDataRole.UserRole, key)
-                    icon = self.images.airline_icon(code, 24) if code else None
-                    if icon is not None:
-                        it.setIcon(QtGui.QIcon(icon))
-                    it.setToolTip(ac["flight"] and f"ACARS flight id {ac['flight']}")
-                if c == 2 and key and key in self._planes:
-                    it.setToolTip("On the map: click the row to select it")
+                    it.setFont(bold)
+                    if code:
+                        it.setIcon(QtGui.QIcon(self.images.airline_icon(code, 40)))
+                    if ac["flight"]:
+                        it.setToolTip(f"ACARS flight id {ac['flight']}")
+                elif c == 1:
+                    it.setForeground(QtGui.QColor("#cfd8dc" if name else "#8a9399"))
+                    iso, cname = country(ac["icao"]) if ac["icao"] else (None, "")
+                    fl = self.images.flag(iso)
+                    if fl is not None:
+                        it.setIcon(QtGui.QIcon(fl))
+                        it.setToolTip(f"Registered in {cname}")
+                elif c == 3 and key in self._planes:
+                    it.setToolTip("Also on the map: click the row to select it")
                     it.setForeground(QtGui.QColor("#ffd54f"))
                 t.setItem(r, c, it)
             if key == self._dl_sel:
@@ -1084,8 +1099,9 @@ class AircraftTab(QtWidgets.QWidget):
         ac = self.vdl_msgs.get(key)
         if not ac:
             return
-        name, _code = self._dl_name(ac)
-        out = [f"<p style='margin:4px 0 8px 0'><b style='font-size:12pt'>{html.escape(name)}</b> "
+        cs, name, _code = self._dl_name(ac)
+        title = f"{name} ({cs})" if name else cs
+        out = [f"<p style='margin:4px 0 8px 0'><b style='font-size:12pt'>{html.escape(title)}</b> "
                f"<span style='color:#9aa0a6'>{html.escape(ac['reg'])} · ICAO {html.escape(ac['icao'])} · "
                f"{len(ac['msgs'])} messages</span></p>"]
         for m in reversed(ac["msgs"]):

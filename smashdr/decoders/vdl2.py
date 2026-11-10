@@ -603,28 +603,54 @@ def position(text):
 
 
 LABELS = {
-    "_d": "Keep-alive (no content)", "Q0": "Link test", "SA": "Datalink status (media advisory)",
-    "SQ": "Ground station beacon", "5Z": "Airline message", "B9": "ATIS request", "A9": "ATIS",
-    "H1": "Avionics message", "80": "Airline message", "C1": "Uplink to the cockpit printer",
-    "RA": "Uplink to the cockpit printer", "10": "Out of the gate / departure", "11": "Takeoff",
-    "12": "Landed", "13": "At the gate",
+    "_d": "Keep-alive (no content)", "Q0": "Link test", "SQ": "Ground station beacon",
+    "5Z": "Airline message", "B9": "ATIS request", "A9": "ATIS", "H1": "Avionics message",
+    "C1": "Uplink to the cockpit printer", "RA": "Uplink to the cockpit printer",
+    ":;": "Radio auto-tune (change of ACARS frequency)",
 }
-H1_KINDS = (("#DF", "Engine and flight data report"), ("#CF", "Maintenance fault report"),
-            ("#M1", "Flight management computer (FMS)"), ("#M2", "Flight management computer (FMS)"),
-            ("#MD", "Flight management computer (FMS)"), ("#T", "Cabin terminal message"),
-            ("#EI", "Engine report"), ("#10", "Avionics data block"), ("#1", "Avionics data block"))
+H1_KINDS = (("#DF", "Engine and flight data report (airline-specific format)"),
+            ("#CF", "Maintenance fault report"), ("#M1", "Flight management computer (FMS)"),
+            ("#M2", "Flight management computer (FMS)"), ("#MD", "Flight management computer (FMS)"),
+            ("#T", "Cabin terminal message"), ("#EI", "Engine report"),
+            ("#10", "Avionics data block"), ("#1", "Avionics data block"))
+# ARINC 622 air traffic services inside ACARS: '/<sub> <ground address>.<IMI>.<reg><hex>'
+ATS_IMI = {"AT1": "CPDLC: controller-pilot datalink message", "CR1": "CPDLC logon (connect request)",
+           "CC1": "CPDLC connect confirm", "DR1": "CPDLC disconnect", "ADS": "ADS-C position report",
+           "DIS": "ADS-C disconnect", "FMH": "FANS message", "FPO": "Flight plan"}
+_ATS = re.compile(r"/([A-Z0-9]{2})\s?([A-Z0-9]{7})\.([A-Z0-9]{3})\.")
+SA_MEDIA = {"V": "VHF ACARS", "S": "satcom", "H": "HF", "G": "Globalstar satcom", "C": "ICO satcom",
+            "2": "VDL mode 2", "X": "Inmarsat satcom", "I": "Iridium satcom"}
+
+
+def media_advisory(text):
+    """Label SA, e.g. '0EV215623V/': which datalink was established or lost, at what time (UTC)."""
+    t = (text or "").strip()
+    if len(t) < 10 or t[1] not in "EL":
+        return None
+    media = SA_MEDIA.get(t[2], t[2])
+    hh, mm, ss = t[3:5], t[5:7], t[7:9]
+    up = [SA_MEDIA.get(c, c) for c in t[9:].split("/")[0] if c in SA_MEDIA]
+    return (f"Datalink status: {media} {'connected' if t[1] == 'E' else 'lost'} at {hh}:{mm}:{ss} UTC"
+            + (f" (available: {', '.join(up)})" if up else ""))
 
 
 def describe(acars):
     """Short plain-language line for an ACARS message (what it is, plus a position if it has one)."""
     lab = (acars or {}).get("label", "")
     text = (acars or {}).get("text", "") or ""
+    ats = _ATS.search(text[:40])
     if lab.startswith("_"):
         what = "Keep-alive (no content)"
+    elif ats and ats.group(3) in ATS_IMI:
+        what = f"{ATS_IMI[ats.group(3)]} (with {ats.group(2)})"
+    elif lab == "SA" and media_advisory(text):
+        what = media_advisory(text)
     elif lab == "H1":
         what = next((d for p, d in H1_KINDS if text.startswith(p)), "Avionics message")
     elif lab in LABELS:
         what = LABELS[lab]
+    elif lab[:1] == "Q" and lab != "Q0":
+        what = "Out / Off / On / In time report (gate and runway times)"
     elif lab[:1].isdigit():
         what = f"Airline message (label {lab})"
     else:
@@ -632,8 +658,4 @@ def describe(acars):
     pos = position(text)
     if pos:
         what += f" · position {abs(pos[0]):.2f}°{'N' if pos[0] >= 0 else 'S'} {abs(pos[1]):.2f}°{'E' if pos[1] >= 0 else 'W'}"
-    printable = sum(ch.isalnum() or ch in " .,/-:+" for ch in text)
-    if text and printable / len(text) > 0.9 and text.count(" ") < 3 and len(text) > 30 and not pos \
-            and lab != "H1":
-        what += " (airline-coded)"
     return what
