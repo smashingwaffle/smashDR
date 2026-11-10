@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.9.7"
+VERSION = "0.9.8"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1014,6 +1014,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.rec_btn = QtWidgets.QPushButton("Record IQ")
         self.rec_btn.setCheckable(True)
         self.rec_btn.toggled.connect(self.toggle_record)
+        self.rec_btn.setToolTip("Record the raw IQ of the whole span (.cu8 + .json).\n"
+                                "Right-click for the recordings folder.")
+        self.rec_btn.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.rec_btn.customContextMenuRequested.connect(self._rec_menu)
+        self.rec_dir_btn = QtWidgets.QPushButton("📂")
+        self.rec_dir_btn.setFixedWidth(32)
+        self.rec_dir_btn.setToolTip("Open the recordings folder")
+        self.rec_dir_btn.clicked.connect(self._open_rec_dir)
 
         row2 = QtWidgets.QHBoxLayout()
         for w in (QtWidgets.QLabel("Step"), self.step_box,
@@ -1031,7 +1039,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.eq_btn.clicked.connect(self._open_eq)
         self._eq_panel = None
         self._eq_btn_state()
-        for w in (QtWidgets.QLabel("Vol"), self.vol_slider, self.eq_btn, self.mute_chk, self.rec_btn):
+        for w in (QtWidgets.QLabel("Vol"), self.vol_slider, self.eq_btn, self.mute_chk, self.rec_btn,
+                  self.rec_dir_btn):
             row2.addWidget(w)
         # waterfall look, right here so you can watch it while adjusting
         self.wf_bright = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
@@ -1364,6 +1373,10 @@ class MainWindow(QtWidgets.QMainWindow):
         rec_row = QtWidgets.QHBoxLayout()
         rec_row.addWidget(self.rec_dir_edit, 1)
         rec_row.addWidget(browse)
+        open_rec = QtWidgets.QPushButton("Open")
+        open_rec.setToolTip("Open the recordings folder")
+        open_rec.clicked.connect(self._open_rec_dir)
+        rec_row.addWidget(open_rec)
         recording = QtWidgets.QGroupBox("Recording")
         recf = QtWidgets.QFormLayout(recording)
         recf.addRow("Folder", rec_row)
@@ -2073,6 +2086,25 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.wf_img.setColorMap(pg.colormap.get(name))
         except Exception:
             self.wf_img.setColorMap(pg.colormap.get("inferno"))
+
+    def _rec_folder(self):
+        d = getattr(self, "rec_dir_edit", None)
+        return Path((d.text().strip() if d else "") or self.opts.get("rec_dir") or RECORDINGS)
+
+    def _open_rec_dir(self):
+        d = self._rec_folder()
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(d)))
+
+    def _rec_menu(self, pos):
+        m = QtWidgets.QMenu(self)
+        m.addAction("📂  Open recordings folder", self._open_rec_dir)
+        m.addAction(f"Folder: {self._rec_folder()}").setEnabled(False)
+        m.addAction("Change folder…", self._browse_rec_dir)
+        m.exec(self.rec_btn.mapToGlobal(pos))
 
     def _browse_rec_dir(self):
         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Recording folder",
