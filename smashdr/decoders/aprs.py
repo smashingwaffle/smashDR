@@ -16,6 +16,7 @@ HDLC flags, de-stuff, CRC-16/X.25, AX.25 UI frame -> TNC2 text + APRS parse
 (uncompressed / compressed / Mic-E positions, messages, status).
 """
 
+import re
 import time
 
 import numpy as np
@@ -64,10 +65,31 @@ def parse_ax25(frame: bytes):
     path = ",".join(c + ("*" if h else "") for c, h in digis)
     p = {"src": src, "dst": dst, "path": path, "info": info,
          "text": f"{src}>{dst}{',' + path if path else ''}:{info}",
-         "via_iss": any(c.split("-")[0] in ("RS0ISS", "NA1SS", "ARISS") and h for c, h in digis)
+         "via_iss": any(c.split("-")[0] in ISS_CALLS and h for c, h in digis)
                     or src.split("-")[0] == "RS0ISS"}
     p.update(parse_aprs(info, dst))
     return p
+
+
+# ---- symbols (primary table '/'; most overlay-table '\\' symbols mean the same thing) -------------
+SYMBOLS = {
+    ">": ("🚗", "car"), "<": ("🏍", "motorcycle"), "b": ("🚲", "bicycle"), "k": ("🛻", "truck"),
+    "u": ("🚛", "truck"), "v": ("🚐", "van"), "j": ("🚙", "jeep"), "R": ("🚌", "RV"), "U": ("🚌", "bus"),
+    "a": ("🚑", "ambulance"), "f": ("🚒", "fire truck"), "!": ("🚓", "police"), "[": ("🚶", "person"),
+    "-": ("🏠", "home"), "y": ("🏠", "home (yagi)"), "#": ("✳", "digipeater"), "&": ("◆", "gateway"),
+    "r": ("📡", "repeater"), "_": ("🌤", "weather"), "W": ("🌤", "weather (NWS)"), "^": ("✈", "aircraft"),
+    "'": ("🛩", "small aircraft"), "X": ("🚁", "helicopter"), "s": ("🚤", "boat"), "Y": ("⛵", "yacht"),
+    "O": ("🎈", "balloon"), "$": ("☎", "phone"), "h": ("🏥", "hospital"), "o": ("🏢", "EOC"),
+    "+": ("✚", "Red Cross"), "K": ("🏫", "school"), "n": ("📍", "node"), "l": ("💻", "laptop"),
+    "=": ("🚂", "train"), "/": ("•", "dot"), ";": ("⛺", "campground"), "`": ("📡", "dish"),
+}
+
+
+def symbol(sym):
+    """'/>' -> ('🚗', 'car'); unknown -> ('•', '')."""
+    if not sym or len(sym) < 2:
+        return "•", ""
+    return SYMBOLS.get(sym[1], ("•", ""))
 
 
 # ---- APRS info field ---------------------------------------------------------------------
@@ -182,7 +204,42 @@ def parse_aprs(info: str, dst: str = "") -> dict:
             out.update(kind="telemetry")
     except (ValueError, IndexError):
         pass
+    if out.get("kind") == "position" and out.get("sym", " _")[1:] == "_":
+        out["kind"] = "weather"
+        c = out.get("comment", "")
+        m = re.search(r"t(-?\d{2,3})", c)
+        if m:
+            out["temp_f"] = int(m.group(1))
+        m = re.match(r"(\d{3})/(\d{3})", c)
+        if m:
+            out["wind"] = (int(m.group(1)), int(m.group(2)))
     return out
+
+
+ISS_CALLS = ("RS0ISS", "NA1SS", "ARISS")
+
+
+def parse_log_line(ln):
+    """A user/aprs.txt line ('2026-11-09 20:51:03  144.390  SRC>DST,PATH:info') -> packet dict or None."""
+    try:
+        d, tm, fq, text = ln.rstrip("\n").split(None, 3)
+        head, info = text.split(":", 1)
+        src, rest = head.split(">", 1)
+        dst, _, path = rest.partition(",")
+        t = time.mktime(time.strptime(f"{d} {tm}", "%Y-%m-%d %H:%M:%S"))
+        freq = float(fq) * 1e6
+    except ValueError:
+        return None
+    p = {"src": src, "dst": dst, "path": path, "info": info, "text": text, "t": t, "freq": freq,
+         "band": "ISS" if abs(freq - 145_825_000) < 20_000 else "APRS",
+         "via_iss": any(c.rstrip("*").split("-")[0] in ISS_CALLS and c.endswith("*")
+                        for c in path.split(",")) or src.split("-")[0] == "RS0ISS"}
+    p.update(parse_aprs(info, dst))
+    return p
+
+
+def log_line(p):
+    return f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(p['t']))}  {p['freq'] / 1e6:.3f}  {p['text']}\n"
 
 
 # ---- demodulator -------------------------------------------------------------------------

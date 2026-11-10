@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.9.6"
+VERSION = "0.9.7"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -906,6 +906,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sat_tab.tune_request.connect(self._sat_tune)
         self.sat_tab.auto_switch.connect(self._sat_auto)
         tabs.addTab(self.sat_tab, "ISS")
+        from smashdr.ui.aprs_tab import AprsTab
+        self.aprs_tab = AprsTab(opts)
+        self.aprs_tab.tune_request.connect(self._sat_tune)
+        tabs.addTab(self.aprs_tab, "APRS")
         tabs.addTab(self._build_settings_tab(), "Settings")
         tabs.setCurrentIndex(min(max(int(opts.get("tab", 0)), 0), tabs.count() - 1))
         # save settings every 30 s too, so a crash or power cut doesn't lose them
@@ -925,6 +929,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reader.transcript.connect(self.on_transcript)
         self.reader.ais.connect(self.aircraft_tab.on_ais)
         self.reader.aprs.connect(self.sat_tab.on_aprs)
+        self.reader.aprs.connect(self.aprs_tab.on_aprs)
 
         self.presets_win = None
         self._apply_mode_ui()
@@ -2302,6 +2307,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.opts["presets_open"] = False
         self.aircraft_tab.collect()
         self.sat_tab.collect()
+        self.aprs_tab.collect()
         self.opts.update(
             tab=self.tabs.currentIndex(),
             split_tx=self.tx_split.sizes(),

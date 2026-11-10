@@ -262,10 +262,9 @@ class SatTab(QtWidgets.QWidget):
         left.addWidget(self.table, 1)
 
         # APRS log, to the right of the map
-        self.pk_lbl = QtWidgets.QLabel("<b>APRS log</b>")
-        self.pk_lbl.setToolTip("Decoded from 145.825 (ISS) and 144.390 (APRS) whenever they are in the\n"
-                               "receiver's span. Orange = digipeated by the ISS. Double-click: show on the map.\n"
-                               "Everything is also written to user/aprs.txt.")
+        self.pk_lbl = QtWidgets.QLabel("<b>ISS APRS</b>")
+        self.pk_lbl.setToolTip("Packets on 145.825 or digipeated by the ISS (RS0ISS). Orange = via the ISS.\n"
+                               "Double-click: show on the map. Everything else is on the APRS tab.")
         open_btn = QtWidgets.QPushButton("Open aprs.txt")
         open_btn.clicked.connect(self._open_log)
         clr_btn = QtWidgets.QPushButton("Clear")
@@ -438,9 +437,12 @@ class SatTab(QtWidgets.QWidget):
     KIND = {"position": "position", "message": "message", "status": "status", "telemetry": "telemetry"}
 
     def on_aprs(self, pkts, log=True):
+        """Only what has to do with the ISS (its channel or digipeated by it); the APRS tab has the rest."""
         t = self.pk_table
         new_st = []
         for p in pkts:
+            if not (p["via_iss"] or p["band"] == "ISS"):
+                continue
             lt = time.localtime(p["t"])
             when = time.strftime("%H:%M:%S" if time.time() - p["t"] < 20 * 3600 else "%b %d %H:%M", lt)
             chan = "ISS" if p["band"] == "ISS" else "144.39"
@@ -467,15 +469,6 @@ class SatTab(QtWidgets.QWidget):
                       "when": f"{when} on {chan}", "text": p["text"][:200]}
                 self.stations[p["src"]] = st
                 new_st.append(st)
-            if not log:
-                continue
-            try:
-                USER.mkdir(exist_ok=True)
-                with open(USER / "aprs.txt", "a", encoding="utf-8") as f:
-                    f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(p['t']))}  "
-                            f"{p['freq'] / 1e6:.3f}  {p['text']}\n")
-            except OSError:
-                pass
         while t.rowCount() > 500:
             t.removeRow(t.rowCount() - 1)
         self._pk_count()
@@ -486,7 +479,7 @@ class SatTab(QtWidgets.QWidget):
         t = self.pk_table
         n = t.rowCount()
         iss = sum(1 for r in range(n) if "via ISS" in (t.item(r, 1).text() if t.item(r, 1) else ""))
-        self.pk_lbl.setText(f"<b>APRS log</b> ({n}{f', {iss} via ISS' if iss else ''})")
+        self.pk_lbl.setText(f"<b>ISS APRS</b> ({n}{f', {iss} via ISS' if iss else ''})")
 
     def _open_log(self):
         f = USER / "aprs.txt"
@@ -495,31 +488,15 @@ class SatTab(QtWidgets.QWidget):
             return
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(f)))
 
-    def _load_history(self, n=200):
-        """Last n packets from user/aprs.txt, so the log and the map survive a restart."""
+    def _load_history(self, n=2000):
+        """ISS packets among the last n lines of user/aprs.txt (written by the APRS tab)."""
         from smashdr.decoders import aprs as A
         try:
             with open(USER / "aprs.txt", encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()[-n:]
         except OSError:
             return
-        pkts = []
-        for ln in lines:
-            try:
-                d, tm, fq, text = ln.rstrip("\n").split(None, 3)
-                head, info = text.split(":", 1)
-                src, rest = head.split(">", 1)
-                dst, _, path = rest.partition(",")
-                t = time.mktime(time.strptime(f"{d} {tm}", "%Y-%m-%d %H:%M:%S"))
-                freq = float(fq) * 1e6
-            except ValueError:
-                continue
-            p = {"src": src, "dst": dst, "path": path, "info": info, "text": text, "t": t, "freq": freq,
-                 "band": "ISS" if abs(freq - 145_825_000) < 20_000 else "APRS",
-                 "via_iss": any(c.rstrip("*").split("-")[0] in ("RS0ISS", "NA1SS", "ARISS") and c.endswith("*")
-                                for c in path.split(",")) or src.split("-")[0] == "RS0ISS"}
-            p.update(A.parse_aprs(info, dst))
-            pkts.append(p)
+        pkts = [p for p in (A.parse_log_line(ln) for ln in lines) if p]
         if pkts:
             self.on_aprs(pkts, log=False)
 

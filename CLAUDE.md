@@ -177,9 +177,11 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   Doppler is inside the filter): FM discriminator, 1200/2200 correlators (1 bit), twists 0.5/1/2,
   run-length clock (round(run/40) bits), NRZI/HDLC/CRC shared with ais.py, AX.25 UI -> TNC2 +
   parse_aprs (uncompressed, compressed, Mic-E, message, status, third party). Decodes the last 4 s
-  every 1 s, dedupe 30 s; 0.16x realtime. SdrReader._run_aprs -> `aprs` signal -> SatTab.on_aprs:
-  'APRS log' panel right of the ISS map (hsplit, opt sat_hsplit; last 200 lines reloaded from
-  user/aprs.txt at start), stations on the ISS map (orange = via RS0ISS).
+  every 1 s, dedupe 30 s; 0.16x realtime. SdrReader._run_aprs -> `aprs` signal -> both
+  `ui/aprs_tab.py` AprsTab (APRS tab, receive only: Leaflet map with symbol glyphs from
+  aprs.SYMBOLS (emoji, no symbol sprites bundled) + tracks, station list (dist from home, sortable),
+  filterable log (opts aprs_*); writes user/aprs.txt via aprs.log_line, reloads the last 500 with
+  parse_log_line) and SatTab.on_aprs (ISS-only panel right of the ISS map, stations on that map).
   Test: `python -m tests.test_aprs` (synthetic AFSK + Doppler). Untested on air.
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
   Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
