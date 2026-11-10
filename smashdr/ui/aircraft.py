@@ -562,6 +562,11 @@ class InfoCard(QtWidgets.QFrame):
         text.addStretch(1)
         text.addWidget(self.live)
         text.addWidget(self.ehs)
+        self.acars = QtWidgets.QLabel()
+        self.acars.setObjectName("acars")
+        self.acars.setWordWrap(True)
+        self.acars.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        text.addWidget(self.acars)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(10, 10, 12, 10)
         lay.addWidget(self.photo)
@@ -576,6 +581,7 @@ class InfoCard(QtWidgets.QFrame):
         self.type_lbl.setText("")
         self.live.setText("")
         self.ehs.setText("")
+        self.acars.setText("")
         self.photo.setPixmap(QtGui.QPixmap())
         self.photo.setText("")
 
@@ -657,6 +663,14 @@ class AircraftTab(QtWidgets.QWidget):
                                 "span; ships then show on this map (layer 'Ships (AIS)').")
         self.ais_btn.clicked.connect(lambda: self.tune_request.emit(162_000_000))
         bar.addWidget(self.ais_btn)
+        self.vdl_btn = QtWidgets.QPushButton("📨 Datalink (VDL2 136 MHz)")
+        self.vdl_btn.setToolTip("Tune the scanner near 136.45 MHz so the VDL Mode 2 channels (136.100 and\n"
+                                "136.650-136.975) are in its span. ACARS messages show in the Datalink\n"
+                                "list and on the selected plane's card, matched by ICAO address.")
+        self.vdl_btn.clicked.connect(lambda: self.tune_request.emit(136_450_000))
+        bar.addWidget(self.vdl_btn)
+        self.vdl_msgs = {}                       # ICAO -> [messages], newest last
+        self.vdl_count = 0
 
         self.card = InfoCard()
 
@@ -711,7 +725,23 @@ class AircraftTab(QtWidgets.QWidget):
         srow.addWidget(self.match_lbl)
         ll.addLayout(srow)
         ll.addWidget(self.card)
-        ll.addWidget(self.table, 1)
+        self.dl_table = QtWidgets.QTableWidget(0, 7)
+        self.dl_table.setHorizontalHeaderLabels(["Time", "MHz", "Flight", "Reg", "ICAO", "Label", "Message"])
+        self.dl_table.verticalHeader().setVisible(False)
+        self.dl_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.dl_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.dl_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.dl_table.setWordWrap(False)
+        dh = self.dl_table.horizontalHeader()
+        dh.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        dh.setSectionResizeMode(6, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.dl_table.itemSelectionChanged.connect(self._dl_selected)
+        self.lists = QtWidgets.QTabWidget()
+        self.lists.addTab(self.table, "Aircraft")
+        self.lists.addTab(self.dl_table, "Datalink")
+        self.lists.setTabToolTip(1, "VDL Mode 2 / ACARS messages decoded by the scanner (136 MHz).\n"
+                                    "Click one to select that plane. Also logged to user/vdl2.txt.")
+        ll.addWidget(self.lists, 1)
 
         if HAVE_WEB:
             self.map = QWebEngineView()
@@ -954,8 +984,73 @@ class AircraftTab(QtWidgets.QWidget):
                          else f"squawk {html.escape(sqtext)}")
         c.live.setText("  ·  ".join(parts))
         c.ehs.setText(self._ehs_html(p))
+        c.acars.setText(self._acars_html(p["icao"]))
         if lookup:
             self._lookup(p)
+
+    # ---- VDL2 datalink (from the scanner's SdrReader) -------------------------
+    ACARS_LABELS = {"_d": "keep-alive", "H1": "avionics message", "SA": "media advisory",
+                    "Q0": "link test", "5Z": "airline downlink", "SQ": "squitter"}
+
+    def on_vdl2(self, msgs):
+        t = self.dl_table
+        for m in msgs:
+            a = m.get("acars")
+            if not a:
+                continue
+            icao = m["src"] if m["src_type"] == "aircraft" else m["dst"] if m["dst_type"] == "aircraft" else ""
+            m["icao"] = icao
+            self.vdl_msgs.setdefault(icao, []).append(m)
+            del self.vdl_msgs[icao][:-30]
+            self.vdl_count += 1
+            when = time.strftime("%H:%M:%S", time.localtime(m["t"]))
+            text = (a.get("text") or "").replace("\r", " ").replace("\n", " ").strip()
+            up = "▲ " if m["src_type"] == "aircraft" else "▼ "
+            row = (when, f"{m['freq'] / 1e6:.3f}", a.get("flight", ""), a.get("reg", ""), icao,
+                   a.get("label", ""), up + text)
+            t.insertRow(0)
+            for c, v in enumerate(row):
+                it = QtWidgets.QTableWidgetItem(v)
+                if c == 6:
+                    it.setToolTip(("Downlink (from the aircraft)" if up == "▲ " else "Uplink (to the aircraft)")
+                                  + f"\n{self.ACARS_LABELS.get(a.get('label', ''), 'label ' + a.get('label', ''))}"
+                                  + "\n\n" + (a.get("text") or "")[:1500])
+                t.setItem(0, c, it)
+            try:
+                USER.mkdir(exist_ok=True)
+                with open(USER / "vdl2.txt", "a", encoding="utf-8") as f:
+                    f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(m['t']))}  "
+                            f"{m['freq'] / 1e6:.3f}  {m['src_type']} {m['src']} -> {m['dst_type']} {m['dst']}  "
+                            f"{a.get('reg', '')} {a.get('flight', '')} {a.get('label', '')}  {text}\n")
+            except OSError:
+                pass
+        while t.rowCount() > 500:
+            t.removeRow(t.rowCount() - 1)
+        self.lists.setTabText(1, f"Datalink ({self.vdl_count})")
+        if self._selected and any(m.get("icao") == self._selected for m in msgs):
+            self._update_card()
+
+    def _acars_html(self, icao):
+        ms = self.vdl_msgs.get(icao)
+        if not ms:
+            return ""
+        m = ms[-1]
+        a = m["acars"]
+        text = html.escape((a.get("text") or "").replace("\r", " ").replace("\n", " ").strip()[:160])
+        when = time.strftime("%H:%M", time.localtime(m["t"]))
+        return (f"<span style='color:#b39ddb'>📨 {len(ms)} datalink msg{'s' if len(ms) > 1 else ''} · "
+                f"last {when} label {html.escape(a.get('label', ''))}</span><br>"
+                f"<span style='color:#9aa0a6;font-family:Consolas,monospace;font-size:9pt'>{text}</span>")
+
+    def _dl_selected(self):
+        rows = self.dl_table.selectionModel().selectedRows()
+        if not rows:
+            return
+        it = self.dl_table.item(rows[0].row(), 4)
+        icao = it.text() if it else ""
+        if icao and icao in self._planes:
+            self._select(icao, center=True)
+            self._select_row(icao)
 
     def _route_html(self, p, lookup):
         """Route line: what the plane is doing (inferred) checked against the database."""

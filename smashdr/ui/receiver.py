@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.9.8"
+VERSION = "0.10.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -141,6 +141,7 @@ from smashdr.decoders.digital_live import DmrLive, DstarLive, YsfLive  # noqa: E
 from smashdr.decoders import p25 as p25mod  # noqa: E402
 from smashdr.decoders import ais as ais_dec  # noqa: E402
 from smashdr.decoders import aprs as aprs_dec  # noqa: E402
+from smashdr.decoders import vdl2 as vdl2_dec  # noqa: E402
 
 try:
     from smashdr.ui import audio  # noqa: E402
@@ -181,6 +182,7 @@ class SdrReader(QtCore.QThread):
     transcript = QtCore.pyqtSignal(object)
     ais = QtCore.pyqtSignal(object)           # list of decoded AIS messages
     aprs = QtCore.pyqtSignal(object)          # list of decoded APRS packets (145.825 / 144.390)
+    vdl2 = QtCore.pyqtSignal(object)          # list of decoded VDL2 / ACARS frames (136 MHz)
 
     def __init__(self, sdr: RtlSdr, opts: dict):
         super().__init__()
@@ -209,6 +211,8 @@ class SdrReader(QtCore.QThread):
         self._ais_key = None
         self._aprs = None                   # AprsRx while 145.825 or 144.390 is inside the span
         self._aprs_key = None
+        self._vdl2 = None                   # Vdl2Rx while a VDL2 channel is inside the span
+        self._vdl2_key = None
         # speech-to-text of finished clear P25 calls (optional: pip install faster-whisper)
         self._call_pcm = None               # list of 48 kHz chunks while a call is up
         self._an_pcm = None                 # same for analog (squelch-gated)
@@ -454,6 +458,33 @@ class SdrReader(QtCore.QThread):
                 print("[aprs]", p["text"], flush=True)
             self.aprs.emit(pkts)
 
+    def _run_vdl2(self, iq, center, rate):
+        """Aircraft datalink on the side whenever a VDL Mode 2 channel (136 MHz) is in the span."""
+        key = (center, rate)
+        if key != self._vdl2_key:
+            self._vdl2_key = key
+            self._vdl2 = None
+            if vdl2_dec.Vdl2Rx.covers(rate, center):
+                try:
+                    self._vdl2 = vdl2_dec.Vdl2Rx(rate, center)
+                except ValueError:
+                    pass
+        if self._vdl2 is None:
+            return
+        try:
+            msgs = self._vdl2.process(iq)
+        except Exception as e:                  # never let datalink take the receiver down
+            print("[!] VDL2:", e)
+            self._vdl2 = None
+            return
+        if msgs:
+            for m in msgs:
+                a = m.get("acars") or {}
+                print(f"[vdl2] {m['freq'] / 1e6:.3f} {m['frame']} {m['src_type']} {m['src']} -> "
+                      f"{m['dst_type']} {m['dst']} {a.get('reg', '')} {a.get('flight', '')} "
+                      f"{a.get('label', '')} {(a.get('text') or '')[:60]!r}", flush=True)
+            self.vdl2.emit(msgs)
+
     def _channel_above_floor(self, spec, center, rate):
         half = MODES[self.mode]["half_bw"]
         binw = rate / FFT_SIZE
@@ -513,6 +544,7 @@ class SdrReader(QtCore.QThread):
 
             self._run_ais(iq, center, rate)
             self._run_aprs(iq, center, rate)
+            self._run_vdl2(iq, center, rate)
 
             stats = {"clip": clip, "snr": snr, "sq_open": sq_open,
                      "drops": self._cap.dropped,
@@ -930,6 +962,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reader.ais.connect(self.aircraft_tab.on_ais)
         self.reader.aprs.connect(self.sat_tab.on_aprs)
         self.reader.aprs.connect(self.aprs_tab.on_aprs)
+        self.reader.vdl2.connect(self.aircraft_tab.on_vdl2)
 
         self.presets_win = None
         self._apply_mode_ui()

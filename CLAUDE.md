@@ -183,6 +183,17 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   filterable log (opts aprs_*); writes user/aprs.txt via aprs.log_line, reloads the last 500 with
   parse_log_line) and SatTab.on_aprs (ISS-only panel right of the ISS map, stations on that map).
   Test: `python -m tests.test_aprs` (synthetic AFSK + Doppler). Untested on air.
+- VDL Mode 2: `decoders/vdl2.py` Vdl2Rx, verified on Stefaan's 136 MHz recordings (UA1605 N17359
+  A1277B on 136.100, WN3309 N225WN A1F595 on 136.650, CZ2513 B-226C). Measured on air: Gray(k) bits
+  MSB first, unique word as k = 0 3 2 4 0 1 6 4 1 7 2 5 6 5 7 3, scrambler = m-sequence of
+  x^15+x+1 from index 10680 (Fibonacci, all-ones start) over header + data, header L = bits 3..19
+  LSB first (header FEC ignored), octets LSB first, RS GF(256) 0x187 roots a^120..125, row-wise
+  interleave, AVLC address = per octet ext bit then 7 bits; 28 bits = flag, type(3), ICAO(24).
+  Demod: _Stage (480 kHz slice, 1 ms FFT power per channel, only bursts mixed to 96 kHz),
+  burst_symbols (timing search, 8th-power freq, decision-directed PLL, differential decisions).
+  0.21x realtime. SdrReader._run_vdl2 -> `vdl2` -> AircraftTab.on_vdl2: 'Datalink' list tab next
+  to the aircraft list, card line per plane (by ICAO), user/vdl2.txt, '📨 Datalink' tune button.
+  Test: `python -m tests.test_vdl2` (RS, synthetic burst, the recording if present).
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
   Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,
