@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.10.5"
+VERSION = "0.10.6"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -2491,6 +2491,33 @@ def open_sdr(opts) -> RtlSdr:
 _QT_NOISE = ("QIODevice::read (QSslSocket): device not open",)
 
 
+_CRASH_FILE = None
+
+
+def _crash_log():
+    """If the app ever closes by itself: native crashes (faulthandler, all threads) and uncaught
+    Python errors go to the console and to user/crash.log, with a timestamp."""
+    global _CRASH_FILE
+    import faulthandler
+    import traceback
+    try:
+        USER.mkdir(exist_ok=True)
+        _CRASH_FILE = open(USER / "crash.log", "a", encoding="utf-8", buffering=1)
+        _CRASH_FILE.write(f"\n=== smashDR {VERSION} started {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+        faulthandler.enable(_CRASH_FILE, all_threads=True)
+    except OSError:
+        faulthandler.enable(all_threads=True)
+
+    def hook(et, ev, tb):
+        text = "".join(traceback.format_exception(et, ev, tb))
+        sys.stderr.write(text)
+        if _CRASH_FILE:
+            _CRASH_FILE.write(f"--- {time.strftime('%H:%M:%S')} uncaught error\n{text}")
+    sys.excepthook = hook
+    import threading
+    threading.excepthook = lambda a: hook(a.exc_type, a.exc_value, a.exc_traceback)
+
+
 def _quiet_qt():
     """Hide known-harmless Qt chatter: a finished HTTPS download (flags, photos, lookups) being read
     once more after its connection closed, and Chromium's GPU/HDR probing in the map view."""
@@ -2500,6 +2527,8 @@ def _quiet_qt():
         if any(n in msg for n in _QT_NOISE):
             return
         sys.stderr.write(msg + "\n")
+        if _CRASH_FILE and mode in (QtCore.QtMsgType.QtCriticalMsg, QtCore.QtMsgType.QtFatalMsg):
+            _CRASH_FILE.write(f"--- {time.strftime('%H:%M:%S')} Qt: {msg}\n")
     QtCore.qInstallMessageHandler(handler)
 
 
@@ -2512,6 +2541,7 @@ def main():
     ap.add_argument("--device", type=int)
     args = ap.parse_args()
 
+    _crash_log()
     opts = resolve_options(args)
     sdr = open_sdr(opts)
     _quiet_qt()
@@ -2519,6 +2549,8 @@ def main():
     win = MainWindow(sdr, opts)
     win.show()
     code = app.exec()
+    if _CRASH_FILE:
+        _CRASH_FILE.write(f"=== closed normally {time.strftime('%Y-%m-%d %H:%M:%S')} (code {code})\n")
     sdr.close()
     sys.exit(code)
 
