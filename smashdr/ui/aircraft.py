@@ -21,6 +21,7 @@ from smashdr.core.capture import AsyncCapture
 from smashdr.core.dsp import cu8_to_iq
 from smashdr.decoders import adsb
 from smashdr.decoders import ais as ais_dec
+from smashdr.decoders import vdl2 as vdl2_dec
 
 from PyQt6 import QtNetwork
 
@@ -725,20 +726,36 @@ class AircraftTab(QtWidgets.QWidget):
         srow.addWidget(self.match_lbl)
         ll.addLayout(srow)
         ll.addWidget(self.card)
-        self.dl_table = QtWidgets.QTableWidget(0, 7)
-        self.dl_table.setHorizontalHeaderLabels(["Time", "MHz", "Flight", "Reg", "ICAO", "Label", "Message"])
+        # Datalink: one row per aircraft (like the aircraft list), its messages below
+        self.dl_table = QtWidgets.QTableWidget(0, 6)
+        self.dl_table.setHorizontalHeaderLabels(["Flight", "Reg", "ICAO", "Msgs", "Last", "Latest message"])
         self.dl_table.verticalHeader().setVisible(False)
+        self.dl_table.verticalHeader().setDefaultSectionSize(30)
+        self.dl_table.setIconSize(QtCore.QSize(40, 24))
+        self.dl_table.setShowGrid(False)
+        self.dl_table.setAlternatingRowColors(True)
         self.dl_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.dl_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.dl_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.dl_table.setWordWrap(False)
         dh = self.dl_table.horizontalHeader()
         dh.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        dh.setSectionResizeMode(6, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        dh.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        dh.setHighlightSections(False)
+        self.dl_table.setStyleSheet(self.table.styleSheet())
         self.dl_table.itemSelectionChanged.connect(self._dl_selected)
+        self.dl_view = QtWidgets.QTextBrowser()
+        self.dl_view.setOpenLinks(False)
+        self.dl_view.setStyleSheet("QTextBrowser { background: #1a1c1f; border: none; color: #d7dbe0; }")
+        self.dl_view.setHtml("<p style='color:#9aa0a6'>Pick an aircraft to see its messages.</p>")
+        dl_split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+        dl_split.addWidget(self.dl_table)
+        dl_split.addWidget(self.dl_view)
+        dl_split.setSizes([300, 260])
+        self._dl_sel = None
         self.lists = QtWidgets.QTabWidget()
         self.lists.addTab(self.table, "Aircraft")
-        self.lists.addTab(self.dl_table, "Datalink")
+        self.lists.addTab(dl_split, "Datalink")
         self.lists.setTabToolTip(1, "VDL Mode 2 / ACARS messages decoded by the scanner (136 MHz).\n"
                                     "Click one to select that plane. Also logged to user/vdl2.txt.")
         ll.addWidget(self.lists, 1)
@@ -993,29 +1010,23 @@ class AircraftTab(QtWidgets.QWidget):
                     "Q0": "link test", "5Z": "airline downlink", "SQ": "squitter"}
 
     def on_vdl2(self, msgs):
-        t = self.dl_table
+        changed = False
         for m in msgs:
             a = m.get("acars")
             if not a:
                 continue
             icao = m["src"] if m["src_type"] == "aircraft" else m["dst"] if m["dst_type"] == "aircraft" else ""
             m["icao"] = icao
-            self.vdl_msgs.setdefault(icao, []).append(m)
-            del self.vdl_msgs[icao][:-30]
+            m["what"] = vdl2_dec.describe(a)
+            key = icao or a.get("reg") or "?"
+            ac = self.vdl_msgs.setdefault(key, {"icao": icao, "reg": "", "flight": "", "msgs": []})
+            ac["reg"] = a.get("reg") or ac["reg"]
+            ac["flight"] = a.get("flight") or ac["flight"]
+            ac["msgs"].append(m)
+            del ac["msgs"][:-50]
             self.vdl_count += 1
-            when = time.strftime("%H:%M:%S", time.localtime(m["t"]))
+            changed = True
             text = (a.get("text") or "").replace("\r", " ").replace("\n", " ").strip()
-            up = "▲ " if m["src_type"] == "aircraft" else "▼ "
-            row = (when, f"{m['freq'] / 1e6:.3f}", a.get("flight", ""), a.get("reg", ""), icao,
-                   a.get("label", ""), up + text)
-            t.insertRow(0)
-            for c, v in enumerate(row):
-                it = QtWidgets.QTableWidgetItem(v)
-                if c == 6:
-                    it.setToolTip(("Downlink (from the aircraft)" if up == "▲ " else "Uplink (to the aircraft)")
-                                  + f"\n{self.ACARS_LABELS.get(a.get('label', ''), 'label ' + a.get('label', ''))}"
-                                  + "\n\n" + (a.get("text") or "")[:1500])
-                t.setItem(0, c, it)
             try:
                 USER.mkdir(exist_ok=True)
                 with open(USER / "vdl2.txt", "a", encoding="utf-8") as f:
@@ -1024,33 +1035,98 @@ class AircraftTab(QtWidgets.QWidget):
                             f"{a.get('reg', '')} {a.get('flight', '')} {a.get('label', '')}  {text}\n")
             except OSError:
                 pass
-        while t.rowCount() > 500:
-            t.removeRow(t.rowCount() - 1)
-        self.lists.setTabText(1, f"Datalink ({self.vdl_count})")
-        if self._selected and any(m.get("icao") == self._selected for m in msgs):
+        if not changed:
+            return
+        self.lists.setTabText(1, f"Datalink ({len(self.vdl_msgs)} aircraft)")
+        self._fill_datalink()
+        if self._dl_sel in self.vdl_msgs:
+            self._show_dl(self._dl_sel)
+        if self._selected and self._selected in self.vdl_msgs:
             self._update_card()
 
+    def _dl_name(self, ac):
+        """('United 794', 'UAL') from the ADS-B callsign if we see the plane, else from the ACARS flight."""
+        p = self._planes.get(ac["icao"])
+        cs = (p or {}).get("callsign") or vdl2_dec.callsign(ac["flight"])
+        name, code = flight_name(cs) if cs else ("", None)
+        return (name or ac["flight"] or ac["reg"] or ac["icao"]), code
+
+    def _fill_datalink(self):
+        t = self.dl_table
+        t.blockSignals(True)
+        rows = sorted(self.vdl_msgs.items(), key=lambda kv: -kv[1]["msgs"][-1]["t"])
+        t.setRowCount(len(rows))
+        now = time.time()
+        for r, (key, ac) in enumerate(rows):
+            last = ac["msgs"][-1]
+            name, code = self._dl_name(ac)
+            ago = int(now - last["t"])
+            vals = (name, ac["reg"], ac["icao"], str(len(ac["msgs"])),
+                    f"{ago}s" if ago < 60 else f"{ago // 60}m" if ago < 3600 else f"{ago // 3600}h",
+                    ("▲ " if last["src_type"] == "aircraft" else "▼ ") + last["what"])
+            for c, v in enumerate(vals):
+                it = QtWidgets.QTableWidgetItem(v)
+                if c == 0:
+                    it.setData(QtCore.Qt.ItemDataRole.UserRole, key)
+                    icon = self.images.airline_icon(code, 24) if code else None
+                    if icon is not None:
+                        it.setIcon(QtGui.QIcon(icon))
+                    it.setToolTip(ac["flight"] and f"ACARS flight id {ac['flight']}")
+                if c == 2 and key and key in self._planes:
+                    it.setToolTip("On the map: click the row to select it")
+                    it.setForeground(QtGui.QColor("#ffd54f"))
+                t.setItem(r, c, it)
+            if key == self._dl_sel:
+                t.selectRow(r)
+        t.blockSignals(False)
+
+    def _show_dl(self, key):
+        ac = self.vdl_msgs.get(key)
+        if not ac:
+            return
+        name, _code = self._dl_name(ac)
+        out = [f"<p style='margin:4px 0 8px 0'><b style='font-size:12pt'>{html.escape(name)}</b> "
+               f"<span style='color:#9aa0a6'>{html.escape(ac['reg'])} · ICAO {html.escape(ac['icao'])} · "
+               f"{len(ac['msgs'])} messages</span></p>"]
+        for m in reversed(ac["msgs"]):
+            a = m["acars"]
+            up = m["src_type"] == "aircraft"
+            text = (a.get("text") or "").strip()
+            when = time.strftime("%H:%M:%S", time.localtime(m["t"]))
+            out.append(
+                f"<p style='margin:0 0 8px 0'><span style='color:{'#81c784' if up else '#64b5f6'}'>"
+                f"{'▲ from the aircraft' if up else '▼ to the aircraft'}</span> "
+                f"<span style='color:#9aa0a6'>{when} · {m['freq'] / 1e6:.3f} MHz · label "
+                f"{html.escape(a.get('label', ''))}</span><br><b>{html.escape(m['what'])}</b>"
+                + (f"<br><span style='font-family:Consolas,monospace;font-size:9pt;color:#9aa0a6'>"
+                   f"{html.escape(text[:600]).replace(chr(13), '').replace(chr(10), '<br>')}"
+                   f"{'…' if len(text) > 600 else ''}</span>" if text else "")
+                + "</p>")
+        self.dl_view.setHtml("".join(out))
+
     def _acars_html(self, icao):
-        ms = self.vdl_msgs.get(icao)
-        if not ms:
+        ac = self.vdl_msgs.get(icao)
+        if not ac:
             return ""
-        m = ms[-1]
-        a = m["acars"]
-        text = html.escape((a.get("text") or "").replace("\r", " ").replace("\n", " ").strip()[:160])
+        m = ac["msgs"][-1]
         when = time.strftime("%H:%M", time.localtime(m["t"]))
-        return (f"<span style='color:#b39ddb'>📨 {len(ms)} datalink msg{'s' if len(ms) > 1 else ''} · "
-                f"last {when} label {html.escape(a.get('label', ''))}</span><br>"
-                f"<span style='color:#9aa0a6;font-family:Consolas,monospace;font-size:9pt'>{text}</span>")
+        n = len(ac["msgs"])
+        return (f"<span style='color:#b39ddb'>📨 {n} datalink message{'s' if n > 1 else ''} · last {when}: "
+                f"{html.escape(m['what'])}</span>")
 
     def _dl_selected(self):
         rows = self.dl_table.selectionModel().selectedRows()
         if not rows:
             return
-        it = self.dl_table.item(rows[0].row(), 4)
-        icao = it.text() if it else ""
-        if icao and icao in self._planes:
-            self._select(icao, center=True)
-            self._select_row(icao)
+        it = self.dl_table.item(rows[0].row(), 0)
+        key = it.data(QtCore.Qt.ItemDataRole.UserRole) if it else None
+        if not key:
+            return
+        self._dl_sel = key
+        self._show_dl(key)
+        if key in self._planes:
+            self._select(key, center=True)
+            self._select_row(key)
 
     def _route_html(self, p, lookup):
         """Route line: what the plane is doing (inferred) checked against the database."""

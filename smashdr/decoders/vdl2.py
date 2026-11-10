@@ -20,6 +20,7 @@ line with the published burst format:
   * The data is a run of HDLC (AVLC) frames: flags, bit stuffing, CRC-16/X.25.
 """
 
+import re
 import time
 
 import numpy as np
@@ -552,3 +553,87 @@ class Vdl2Rx:
                     m.update(freq=hz, t=now, q=round(float(q), 2))
                     out.append(m)
         return out
+
+
+# ---- plain-language summaries --------------------------------------------------------------
+# ACARS flight ids use the 2-character IATA airline code; ADS-B callsigns the 3-letter ICAO one.
+IATA_ICAO = {"UA": "UAL", "AA": "AAL", "DL": "DAL", "WN": "SWA", "AS": "ASA", "B6": "JBU", "NK": "NKS",
+             "F9": "FFT", "G4": "AAY", "HA": "HAL", "OO": "SKW", "YX": "RPA", "MQ": "ENY", "9E": "EDV",
+             "QX": "QXE", "OH": "JIA", "PT": "PDT", "ZW": "AWI", "CZ": "CSN", "CA": "CCA", "MU": "CES",
+             "CI": "CAL", "BR": "EVA", "CX": "CPA", "NH": "ANA", "JL": "JAL", "KE": "KAL", "OZ": "AAR",
+             "SQ": "SIA", "QF": "QFA", "NZ": "ANZ", "PR": "PAL", "EK": "UAE", "QR": "QTR", "EY": "ETD",
+             "TK": "THY", "BA": "BAW", "VS": "VIR", "LH": "DLH", "AF": "AFR", "KL": "KLM", "LX": "SWR",
+             "IB": "IBE", "EI": "EIN", "AY": "FIN", "AC": "ACA", "WS": "WJA", "AM": "AMX", "Y4": "VOI",
+             "VB": "VIV", "CM": "CMP", "AV": "AVA", "LA": "LAN", "FX": "FDX", "5X": "UPS", "5Y": "GTI",
+             "K4": "CKS", "SY": "SCX", "MX": "MXY", "XP": "VXP", "FJ": "FJI", "ET": "ETH", "CK": "CKK",
+             "OY": "OAE", "3S": "OAE", "KZ": "NCA", "PO": "PAC", "GB": "ABX", "NC": "NAC"}
+
+
+def callsign(flight):
+    """ACARS 'UA0794' -> 'UAL794' (ADS-B style), '' if unknown."""
+    f = (flight or "").strip()
+    if len(f) < 3:
+        return ""
+    code = IATA_ICAO.get(f[:2])
+    num = f[2:].lstrip("0") or "0"
+    return code + num if code and num.isalnum() else ""
+
+
+_POS = (re.compile(r"([NS])\s?(\d{2})(\d{2}\.\d)[ ,]*([EW])\s?(\d{3})(\d{2}\.\d)"),          # N3403.4,W11738.7
+        re.compile(r"([NS])\s?(\d{2})(\d{3})[ ,]*([EW])\s?(\d{3})(\d{3})"))                  # N34034 W117387
+
+
+def position(text):
+    """First lat/lon in an ACARS text (degrees + decimal minutes), or None."""
+    for i, rx in enumerate(_POS):
+        m = rx.search(text or "")
+        if not m:
+            continue
+        try:
+            lat_m = float(m.group(3)) if i == 0 else int(m.group(3)) / 10
+            lon_m = float(m.group(6)) if i == 0 else int(m.group(6)) / 10
+            lat = int(m.group(2)) + lat_m / 60
+            lon = int(m.group(5)) + lon_m / 60
+        except ValueError:
+            continue
+        if lat_m >= 60 or lon_m >= 60 or lat > 90 or lon > 180:
+            continue
+        return (-lat if m.group(1) == "S" else lat), (-lon if m.group(4) == "W" else lon)
+    return None
+
+
+LABELS = {
+    "_d": "Keep-alive (no content)", "Q0": "Link test", "SA": "Datalink status (media advisory)",
+    "SQ": "Ground station beacon", "5Z": "Airline message", "B9": "ATIS request", "A9": "ATIS",
+    "H1": "Avionics message", "80": "Airline message", "C1": "Uplink to the cockpit printer",
+    "RA": "Uplink to the cockpit printer", "10": "Out of the gate / departure", "11": "Takeoff",
+    "12": "Landed", "13": "At the gate",
+}
+H1_KINDS = (("#DF", "Engine and flight data report"), ("#CF", "Maintenance fault report"),
+            ("#M1", "Flight management computer (FMS)"), ("#M2", "Flight management computer (FMS)"),
+            ("#MD", "Flight management computer (FMS)"), ("#T", "Cabin terminal message"),
+            ("#EI", "Engine report"), ("#10", "Avionics data block"), ("#1", "Avionics data block"))
+
+
+def describe(acars):
+    """Short plain-language line for an ACARS message (what it is, plus a position if it has one)."""
+    lab = (acars or {}).get("label", "")
+    text = (acars or {}).get("text", "") or ""
+    if lab.startswith("_"):
+        what = "Keep-alive (no content)"
+    elif lab == "H1":
+        what = next((d for p, d in H1_KINDS if text.startswith(p)), "Avionics message")
+    elif lab in LABELS:
+        what = LABELS[lab]
+    elif lab[:1].isdigit():
+        what = f"Airline message (label {lab})"
+    else:
+        what = f"Label {lab}" if lab else "Message"
+    pos = position(text)
+    if pos:
+        what += f" · position {abs(pos[0]):.2f}°{'N' if pos[0] >= 0 else 'S'} {abs(pos[1]):.2f}°{'E' if pos[1] >= 0 else 'W'}"
+    printable = sum(ch.isalnum() or ch in " .,/-:+" for ch in text)
+    if text and printable / len(text) > 0.9 and text.count(" ") < 3 and len(text) > 30 and not pos \
+            and lab != "H1":
+        what += " (airline-coded)"
+    return what

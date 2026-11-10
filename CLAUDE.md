@@ -191,7 +191,9 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   interleave, AVLC address = per octet ext bit then 7 bits; 28 bits = flag, type(3), ICAO(24).
   Demod: _Stage (480 kHz slice, 1 ms FFT power per channel, only bursts mixed to 96 kHz),
   burst_symbols (timing search, 8th-power freq, decision-directed PLL, differential decisions).
-  0.21x realtime. SdrReader._run_vdl2 -> `vdl2` -> AircraftTab.on_vdl2: 'Datalink' list tab next
+  0.21x realtime. vdl2.describe() = plain-language line (labels, H1 #DF/#CF/#M1.., positions),
+  vdl2.callsign() IATA->ICAO flight. SdrReader._run_vdl2 -> `vdl2` -> AircraftTab.on_vdl2: 'Datalink' tab
+  (one row per aircraft styled like the plane list + message view below) next
   to the aircraft list, card line per plane (by ICAO), user/vdl2.txt, '📨 Datalink' tune button.
   Test: `python -m tests.test_vdl2` (RS, synthetic burst, the recording if present).
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
