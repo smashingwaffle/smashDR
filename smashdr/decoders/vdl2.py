@@ -634,6 +634,18 @@ def media_advisory(text):
             + (f" (available: {', '.join(up)})" if up else ""))
 
 
+_ROUTE = re.compile(r"(?<![A-Z])([KPC][A-Z]{3}|M[MGHNRPSUWYZ][A-Z]{2})[ ,/-]?([KPC][A-Z]{3}|M[MGHNRPSUWYZ][A-Z]{2})(?![A-Z])")
+
+
+def route(text):
+    """'...KDENKSBA...' / 'KONT,KLAS' -> ('KDEN', 'KSBA'): two airport codes back to back."""
+    for m in _ROUTE.finditer(text or ""):
+        a, b = m.group(1), m.group(2)
+        if a != b:
+            return a, b
+    return None
+
+
 def describe(acars):
     """Short plain-language line for an ACARS message (what it is, plus a position if it has one)."""
     lab = (acars or {}).get("label", "")
@@ -655,6 +667,9 @@ def describe(acars):
         what = f"Airline message (label {lab})"
     else:
         what = f"Label {lab}" if lab else "Message"
+    rt = route(text)
+    if rt and not ats:
+        what += f" · route {rt[0]} → {rt[1]}"
     pos = position(text)
     if pos:
         what += f" · position {abs(pos[0]):.2f}°{'N' if pos[0] >= 0 else 'S'} {abs(pos[1]):.2f}°{'E' if pos[1] >= 0 else 'W'}"

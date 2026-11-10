@@ -1026,6 +1026,10 @@ class AircraftTab(QtWidgets.QWidget):
             ac = self.vdl_msgs.setdefault(key, {"icao": icao, "reg": "", "flight": "", "msgs": []})
             ac["reg"] = a.get("reg") or ac["reg"]
             ac["flight"] = a.get("flight") or ac["flight"]
+            text0 = a.get("text") or ""
+            if any(o["acars"].get("text") == text0 and o["acars"].get("label") == a.get("label")
+                   and m["t"] - o["t"] < 90 for o in ac["msgs"][-6:]) and text0:
+                continue                         # same message again (resent / heard on two channels)
             ac["msgs"].append(m)
             del ac["msgs"][:-50]
             self.vdl_count += 1
