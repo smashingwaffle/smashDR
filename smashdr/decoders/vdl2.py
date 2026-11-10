@@ -579,13 +579,19 @@ def callsign(flight):
     return code + num if code and num.isalnum() else ""
 
 
-_POS = (re.compile(r"([NS])\s?(\d{2})(\d{2}\.\d)[ ,]*([EW])\s?(\d{3})(\d{2}\.\d)"),          # N3403.4,W11738.7
+_POS = (re.compile(r"([NS])\s?(\d{1,2}\.\d{2,4}),?\s?([EW])\s?(\d{1,3}\.\d{2,4})"),          # N 33.813 W 118.277
+        re.compile(r"([NS])\s?(\d{2})(\d{2}\.\d)[ ,]*([EW])\s?(\d{3})(\d{2}\.\d)"),          # N3403.4,W11738.7
         re.compile(r"([NS])\s?(\d{2})(\d{3})[ ,]*([EW])\s?(\d{3})(\d{3})"))                  # N34034 W117387
 
 
 def position(text):
     """First lat/lon in an ACARS text (degrees + decimal minutes), or None."""
-    for i, rx in enumerate(_POS):
+    m = _POS[0].search(text or "")
+    if m:
+        lat, lon = float(m.group(2)), float(m.group(4))
+        if lat <= 90 and lon <= 180:
+            return (-lat if m.group(1) == "S" else lat), (-lon if m.group(3) == "W" else lon)
+    for i, rx in enumerate(_POS[1:]):
         m = rx.search(text or "")
         if not m:
             continue
@@ -608,7 +614,11 @@ LABELS = {
     "C1": "Uplink to the cockpit printer", "RA": "Uplink to the cockpit printer",
     ":;": "Radio auto-tune (change of ACARS frequency)",
 }
-H1_KINDS = (("#DF", "Engine and flight data report (airline-specific format)"),
+H1_KINDS = (("#M1BPOS", "FMS position report (with next waypoints)"),
+            ("#M1BREQPWI", "Request for winds aloft along the route"), ("#M2BREQPWI", "Request for winds aloft along the route"),
+            ("#M1BPRG", "Progress report (runway / times)"), ("#M1BRESPOS", "Position report (on request)"),
+            ("#M1BRESREQ", "Response to a ground request"), ("#T1BRTE", "Route / flight plan (cabin terminal)"),
+            ("#DF", "Engine and flight data report (airline-specific format)"),
             ("#CF", "Maintenance fault report"), ("#M1", "Flight management computer (FMS)"),
             ("#M2", "Flight management computer (FMS)"), ("#MD", "Flight management computer (FMS)"),
             ("#T", "Cabin terminal message"), ("#EI", "Engine report"),
@@ -617,7 +627,7 @@ H1_KINDS = (("#DF", "Engine and flight data report (airline-specific format)"),
 ATS_IMI = {"AT1": "CPDLC: controller-pilot datalink message", "CR1": "CPDLC logon (connect request)",
            "CC1": "CPDLC connect confirm", "DR1": "CPDLC disconnect", "ADS": "ADS-C position report",
            "DIS": "ADS-C disconnect", "FMH": "FANS message", "FPO": "Flight plan"}
-_ATS = re.compile(r"/([A-Z0-9]{2})\s?([A-Z0-9]{7})\.([A-Z0-9]{3})\.")
+_ATS = re.compile(r"/(?:([A-Z0-9]{2})\s)?([A-Z0-9]{7})\.([A-Z0-9]{3})\.")
 SA_MEDIA = {"V": "VHF ACARS", "S": "satcom", "H": "HF", "G": "Globalstar satcom", "C": "ICO satcom",
             "2": "VDL mode 2", "X": "Inmarsat satcom", "I": "Iridium satcom"}
 
@@ -655,6 +665,8 @@ def describe(acars):
         what = "Keep-alive (no content)"
     elif ats and ats.group(3) in ATS_IMI:
         what = f"{ATS_IMI[ats.group(3)]} (with {ats.group(2)})"
+    elif lab == "B9" and re.match(r"/([A-Z]{4})\.TI", text):
+        what = f"ATIS request for {text[1:5]} (digital airport information)"
     elif lab == "SA" and media_advisory(text):
         what = media_advisory(text)
     elif lab == "H1":

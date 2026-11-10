@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.10.3"
+VERSION = "0.10.4"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -478,11 +478,6 @@ class SdrReader(QtCore.QThread):
             self._vdl2 = None
             return
         if msgs:
-            for m in msgs:
-                a = m.get("acars") or {}
-                print(f"[vdl2] {m['freq'] / 1e6:.3f} {m['frame']} {m['src_type']} {m['src']} -> "
-                      f"{m['dst_type']} {m['dst']} {a.get('reg', '')} {a.get('flight', '')} "
-                      f"{a.get('label', '')} {(a.get('text') or '')[:60]!r}", flush=True)
             self.vdl2.emit(msgs)
 
     def _channel_above_floor(self, spec, center, rate):
