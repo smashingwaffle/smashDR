@@ -144,7 +144,11 @@ class SkyPlot(pg.PlotWidget):
                            {"pos": pts[-1], "brush": pg.mkBrush("#e57373")}])
 
     def show_now(self, az, el):
-        self.now.setData([self.xy(az, el)] if el > 0 else [])
+        if el > 0:
+            x, y = self.xy(az, el)
+            self.now.setData(x=[x], y=[y])
+        else:
+            self.now.setData(x=[], y=[])
 
 
 class SatTab(QtWidgets.QWidget):
