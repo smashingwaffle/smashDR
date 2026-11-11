@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.10.7"
+VERSION = "0.11.0"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -2545,7 +2545,10 @@ def main():
     opts = resolve_options(args)
     sdr = open_sdr(opts)
     _quiet_qt()
+    from smashdr.ui import tilecache
+    tilecache.register_scheme()
     app = QtWidgets.QApplication(sys.argv)
+    tilecache.install()
     win = MainWindow(sdr, opts)
     win.show()
     code = app.exec()

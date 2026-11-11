@@ -14,6 +14,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from smashdr.decoders import aprs as A
 from smashdr.paths import USER
 from smashdr.ui.aircraft import DEFAULT_HOME, HAVE_WEB, QWebEngineView
+from smashdr.ui import tilecache
 
 if HAVE_WEB:
     from PyQt6.QtWebEngineCore import QWebEnginePage
@@ -389,7 +390,7 @@ class AprsTab(QtWidgets.QWidget):
         html = (MAP_HTML.replace("__LAT__", f"{lat:.4f}").replace("__LON__", f"{lon:.4f}")
                 .replace("__CARTO_KEY__", json.dumps(str(self.opts.get("carto_key", "")).strip())))
         self._map_ready = False
-        self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/aprs"))
+        self.map.setHtml(tilecache.rewrite(html), QtCore.QUrl("https://smashdr.local/aprs"))
 
     def _map_loaded(self, ok):
         self._map_ready = bool(ok)

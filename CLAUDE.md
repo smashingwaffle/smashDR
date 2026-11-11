@@ -197,6 +197,11 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   (one row per aircraft styled like the plane list + message view below) next
   to the aircraft list, card line per plane (by ICAO), user/vdl2.txt, '📨 Datalink' tune button.
   Test: `python -m tests.test_vdl2` (RS, synthetic burst, the recording if present).
+- Offline maps: `ui/tilecache.py` registers scheme smtile:// (before QApplication) and a
+  QWebEngineUrlSchemeHandler on the default profile; tilecache.rewrite(html) swaps https:// for
+  smtile:// on the tile hosts + unpkg (Leaflet) in all three map pages. Files in user/cache/tiles/
+  <host>/<path>, refreshed after 60 days when online, old copy served when offline. View-based
+  only: no bulk prefetch (Esri/CARTO/OSM terms).
 - `core/notify.py` phone alerts via ntfy.sh (free app, private topic in Settings >
   Phone alerts): aircraft emergencies + P25/DMR emergency flag. Background thread.
 - Don't change `.vscode/launch.json` casually: Stefaan may have local edits,

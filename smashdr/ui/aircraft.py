@@ -22,6 +22,7 @@ from smashdr.core.dsp import cu8_to_iq
 from smashdr.decoders import adsb
 from smashdr.decoders import ais as ais_dec
 from smashdr.decoders import vdl2 as vdl2_dec
+from smashdr.ui import tilecache
 
 from PyQt6 import QtNetwork
 
@@ -854,7 +855,7 @@ class AircraftTab(QtWidgets.QWidget):
                 .replace("__SHOW_SHIPS__", "true" if self.opts.get("adsb_map_ships", True) else "false")
                 .replace("__SHOW_AIRPORTS__", "true" if self.opts.get("adsb_map_airports", True) else "false")
                 .replace("__CARTO_KEY__", json.dumps(str(self.opts.get("carto_key", "")).strip())))
-        self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/"))
+        self.map.setHtml(tilecache.rewrite(html), QtCore.QUrl("https://smashdr.local/"))
 
     def _map_pref(self, kind, value):
         if kind == "layer":

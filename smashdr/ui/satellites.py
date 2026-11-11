@@ -16,6 +16,7 @@ from smashdr.core import notify
 from smashdr.paths import USER
 from smashdr.core import satellites as S
 from smashdr.ui.aircraft import DEFAULT_HOME, HAVE_WEB, QWebEngineView
+from smashdr.ui import tilecache
 
 GOOD_EL = 30.0                       # passes at least this high are highlighted
 
@@ -430,7 +431,7 @@ class SatTab(QtWidgets.QWidget):
                 .replace("__NAME__", self.sat.name)
                 .replace("__CARTO_KEY__", json.dumps(str(self.opts.get("carto_key", "")).strip())))
         self._map_ready = False
-        self.map.setHtml(html, QtCore.QUrl("https://smashdr.local/sat"))
+        self.map.setHtml(tilecache.rewrite(html), QtCore.QUrl("https://smashdr.local/sat"))
 
     def _map_loaded(self, ok):
         self._map_ready = bool(ok)
