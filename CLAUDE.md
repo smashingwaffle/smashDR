@@ -50,7 +50,8 @@ Imports are absolute (`from smashdr.core.dsp import ...`).
   decimator), Demod (NFM/AM/WFM -> 48 kHz, gate, limiter, click-free switches)
 - `ui/widgets.py` FreqDisplay (VFO) and LevelMeter
 - Wheel over spectrum/waterfall/strips: 1 step; Shift = 2x step, Alt = half step (Alt+wheel comes in
-  as a horizontal wheel in Qt: use angleDelta x or y), Ctrl = zoom, middle-drag pan, middle-click reset.
+  as a horizontal wheel in Qt: use angleDelta x or y), Ctrl = zoom, middle-drag pan (past the span
+  edge it slides the hardware centre, _pan_center/_pan_sent throttle), middle-click reset.
 - `core/bandplan.py` simplified US band plan, lookup() and in_span()
 - `data/bandplan_la.json` + receiver.PlanStrip: second strip under the band bar with the
   LA ham plan (2 m TASMA rev 2015, 70 cm SCRRBA), shown only when the span covers it.

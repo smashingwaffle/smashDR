@@ -40,7 +40,7 @@ from smashdr.core.eq import Equalizer  # noqa: E402
 from smashdr.paths import DATA, RECORDINGS, ROOT, USER  # noqa: E402
 
 HERE = ROOT
-VERSION = "0.11.1"
+VERSION = "0.11.2"
 
 READ_BYTES = 524288          # 262144 IQ samples per block (~110 ms at 2.4 MS/s)
 WF_ROWS = 300
@@ -1128,6 +1128,8 @@ class MainWindow(QtWidgets.QMainWindow):
         TuneViewBox.pan_hook = self._pan
         TuneViewBox.reset_hook = self._zoom_reset
         self._zoom_w = None                       # visible width in MHz, None = full span
+        self._pan_center = None                   # hardware centre a middle-drag is heading for
+        self._pan_sent = 0.0
 
         # not x-linked (it fed ranges back into the waterfall); it follows the waterfall's
         # visible range one way instead
@@ -2254,8 +2256,28 @@ class MainWindow(QtWidgets.QMainWindow):
         self._set_view(x_mhz - (x_mhz - lo) / factor, w)
 
     def _pan(self, dx_mhz):
+        """Middle-drag. Inside the span the view moves; past its edge the hardware centre
+        slides along (like dragging the band in other SDR apps), unless we are recording."""
         (lo, hi), _ = self.spec_plot.getViewBox().viewRange()
-        self._set_view(lo + dx_mhz, hi - lo)
+        full = self._full_span()
+        if full is None:
+            return
+        f0, span = full
+        new_lo = lo + dx_mhz
+        over = 0.0
+        if new_lo < f0:
+            over = new_lo - f0
+        elif new_lo + (hi - lo) > f0 + span:
+            over = new_lo + (hi - lo) - (f0 + span)
+        self._set_view(new_lo, hi - lo)
+        if over and not self.rec_btn.isChecked():
+            base = self._pan_center if self._pan_center is not None else self.center_hz
+            self._pan_center = base + over * 1e6
+            now = time.time()
+            if now - self._pan_sent > 0.08:               # at most ~12 retunes a second
+                self._pan_sent = now
+                self.reader.request(center=self._pan_center)
+                self._click_block_until = now + 0.6
 
     def _zoom_reset(self):
         full = self._full_span()
@@ -2273,6 +2295,13 @@ class MainWindow(QtWidgets.QMainWindow):
                                 self.center_hz + self.rate_hz / 2)
 
     def on_frame(self, spec, center, rate, stats):
+        if self._pan_center is not None and abs(center - self._pan_center) < 2000 \
+                and time.time() - self._pan_sent > 0.3:
+            self._pan_center = None                       # the hardware caught up with the drag
+        elif self._pan_center is not None and time.time() - self._pan_sent > 0.3 \
+                and abs(center - self._pan_center) >= 2000:
+            self._pan_sent = time.time()                  # last (throttled) step of the drag
+            self.reader.request(center=self._pan_center)
         if center != self.center_hz or rate != self.rate_hz:
             old_c, old_r = self.center_hz, self.rate_hz
             self.center_hz, self.rate_hz = center, rate
