@@ -28,6 +28,7 @@ CACHE = USER / "cache" / "tiles"
 REFRESH_DAYS = 60                 # tiles older than this are refreshed when online (kept if offline)
 
 _handler = None
+_registered = [False]
 
 
 def rewrite(html: str) -> str:
@@ -44,12 +45,15 @@ def register_scheme():
         from PyQt6.QtWebEngineCore import QWebEngineUrlScheme
     except ImportError:
         return
-    s = QWebEngineUrlScheme(SCHEME)
-    s.setSyntax(QWebEngineUrlScheme.Syntax.Host)
-    s.setDefaultPort(QWebEngineUrlScheme.SpecialPort.PortUnspecified)
-    F = QWebEngineUrlScheme.Flag
-    s.setFlags(F.SecureScheme | F.CorsEnabled | F.ContentSecurityPolicyIgnored)
-    QWebEngineUrlScheme.registerScheme(s)
+    try:
+        s = QWebEngineUrlScheme(SCHEME)
+        s.setSyntax(QWebEngineUrlScheme.Syntax.Host)      # default port stays "unspecified"
+        F = QWebEngineUrlScheme.Flag
+        s.setFlags(F.SecureScheme | F.CorsEnabled | F.ContentSecurityPolicyIgnored)
+        QWebEngineUrlScheme.registerScheme(s)
+        _registered[0] = True
+    except Exception as e:                                # maps then just load online as before
+        print("[!] map cache not available:", e)
 
 
 def _path_for(url: QtCore.QUrl):
@@ -153,11 +157,15 @@ def install():
         from PyQt6.QtWebEngineCore import QWebEngineProfile
     except ImportError:
         return
-    if _handler is not None:
+    if _handler is not None or not _registered[0]:
         return
-    Handler = _make_handler()
-    _handler = Handler(QtCore.QCoreApplication.instance())
-    QWebEngineProfile.defaultProfile().installUrlSchemeHandler(SCHEME, _handler)
+    try:
+        Handler = _make_handler()
+        h = Handler(QtCore.QCoreApplication.instance())
+        QWebEngineProfile.defaultProfile().installUrlSchemeHandler(SCHEME, h)
+        _handler = h
+    except Exception as e:
+        print("[!] map cache not available:", e)
 
 
 def size_mb():
